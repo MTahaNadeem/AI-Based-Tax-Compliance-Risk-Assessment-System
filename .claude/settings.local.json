@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:httpsdemoweb.lovable.app)",
+      "PowerShell(\\(Get-Content \"app\\\\static\\\\index.html\" | Measure-Object -Line\\).Lines; \\(Get-Item \"app\\\\static\\\\index.html\"\\).Length; \\(Get-Item \"outputs\\\\api_data.json\"\\).Length)",
+      "PowerShell($d = Get-Content \"outputs\\\\api_data.json\" -Raw | ConvertFrom-Json; $d.PSObject.Properties.Name; \"--- profile keys ---\"; $d.profiles[0].PSObject.Properties.Name; \"--- tiers ---\"; $d.tiers; \"--- n profiles ---\"; $d.profiles.Count)",
+      "PowerShell($d = Get-Content \"outputs\\\\api_data.json\" -Raw | ConvertFrom-Json; \"=== er_stats ===\"; $d.er_stats | ConvertTo-Json -Depth 4; \"=== er_metrics ===\"; $d.er_metrics | ConvertTo-Json; \"=== timings ===\"; $d.timings | ConvertTo-Json; \"=== graph_stats ===\"; $d.graph_stats | ConvertTo-Json; \"=== plugins ===\"; $d.plugins; \"=== llm_active ===\"; $d.llm_active; \"=== generated_at ===\"; $d.generated_at; \"=== pipeline_seconds ===\"; $d.pipeline_seconds; \"=== review_pairs count ===\"; $d.review_pairs.Count; \"=== sample review_pair ===\"; $d.review_pairs[0] | ConvertTo-Json -Depth 4)",
+      "PowerShell($d = Get-Content \"outputs\\\\api_data.json\" -Raw | ConvertFrom-Json; $p = $d.profiles[0]; \"=== sample profile \\(slim view\\) ===\"; $p | Select-Object entity_id,name,score,tier,tier_ur,filer,declared_income,lifestyle_income,household_id,household_members,household_declared,n_vehicles,n_properties,avg_bill,n_sources,n_accounts,annual_deposits,n_intl_trips,travel_spend | ConvertTo-Json; \"=== components/weights/comp_names ===\"; $p.components | ConvertTo-Json; $p.weights | ConvertTo-Json; $p.comp_names | ConvertTo-Json; \"=== evidence[0..2] ===\"; $p.evidence[0..2] | ConvertTo-Json -Depth 3; \"=== timeline ===\"; $p.timeline | ConvertTo-Json -Depth 3; \"=== match_provenance ===\"; $p.match_provenance | ConvertTo-Json -Depth 3; \"=== graph nodes sample ===\"; $p.graph.nodes[0..4] | ConvertTo-Json -Depth 3; \"=== graph links sample ===\"; $p.graph.links[0..2] | ConvertTo-Json -Depth 3)",
+      "PowerShell(node --check app\\\\static\\\\app.js)",
+      "PowerShell(if \\($?\\) { \"JS syntax OK\" })",
+      "PowerShell($r = Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:8011/'; if\\($r.Content -match 'app\\\\.js\\\\?v=4' -and $r.Content -match 'styles\\\\.css\\\\?v=4' -and $r.Content -match 'ribbon'\\){ \"index.html serves v4 shell OK\" }; $r2 = Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:8011/api/export/csv?tier=CRITICAL&top=2'; \\($r2.Content -split \"`n\"\\)[0])",
+      "PowerShell(if \\($?\\) { \"final JS check OK\" })"
+    ]
+  }
+}

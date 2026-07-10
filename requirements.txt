@@ -1,0 +1,9 @@
+pandas
+networkx
+rapidfuzz
+jellyfish
+torch
+torch_geometric
+fastapi
+uvicorn
+numpy

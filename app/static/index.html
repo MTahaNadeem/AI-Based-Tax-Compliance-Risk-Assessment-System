@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaxNet Graph — National Tax Intelligence</title>
+<meta name="description" content="TaxNet Graph — entity resolution, knowledge graph and GraphSAGE anomaly detection over national tax records.">
+<link rel="stylesheet" href="/static/styles.css?v=4">
+<script src="/static/vendor/d3.min.js"></script>
+</head>
+<body>
+
+<div class="ribbon">Restricted · For Official Use Only · <b>Synthetic demonstration data</b> · TaxNet Graph</div>
+
+<header class="mast">
+  <div class="mast-in">
+    <div class="seal-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M14.6 3.2a9 9 0 1 0 5.2 11.9A8 8 0 0 1 14.6 3.2Z" fill="#D9B96A"/>
+        <path d="M16.9 8.2l.9 2.1 2.3.2-1.7 1.5.5 2.2-2-1.2-2 1.2.5-2.2-1.7-1.5 2.3-.2.9-2.1Z" fill="#D9B96A"/>
+      </svg>
+    </div>
+    <div class="brand">
+      <h1>TaxNet Graph</h1>
+      <div class="ur">قومی ٹیکس نیٹ — گراف انٹیلی جنس</div>
+    </div>
+    <div class="mast-right">
+      <div class="live"><i></i>Pipeline data linked</div>
+      <div class="runinfo" id="runinfo">loading run info…</div>
+      <div class="clock"><span id="clock">--:--:--</span><small>PKT · Islamabad</small></div>
+    </div>
+  </div>
+  <nav class="nav" id="nav" aria-label="Primary">
+    <a class="navtab" href="#/" data-route="home">Home</a>
+    <a class="navtab" href="#/dashboard" data-route="dashboard">Dashboard</a>
+    <a class="navtab" href="#/register" data-route="register">Risk Register</a>
+    <a class="navtab" href="#/integrations" data-route="integrations">Integrations <span class="nn" id="nav-rq" hidden></span></a>
+    <a class="navtab" href="#/control" data-route="control">Control Panel</a>
+  </nav>
+</header>
+
+<main id="view" tabindex="-1"></main>
+
+<footer>
+  <span><b>TaxNet Graph</b> · entity resolution → knowledge graph → GraphSAGE anomaly → decomposable scoring</span>
+  <span id="foot"></span>
+</footer>
+
+<div class="toast-wrap" id="toasts" role="status" aria-live="polite"></div>
+
+<script src="/static/app.js?v=4"></script>
+</body>
+</html>
