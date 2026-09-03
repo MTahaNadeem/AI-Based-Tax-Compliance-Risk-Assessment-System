@@ -1400,7 +1400,7 @@ VIEWS['add-person'] = async (el, _param, my) => {
           <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
           <div class="eyebrow"><span class="en">Additional Details · optional</span><span class="ur">مزید تفصیل</span></div>
           <div class="ctl-grid" style="margin-bottom:18px;">
-            <label class="note">Father/Husband Name<input type="text" id="ap-father" class="txt" style="margin-top:5px;"></label>
+            <label class="note">Father/Husband Name<input type="text" id="ap-father" value="" autocomplete="off" class="txt" style="margin-top:5px;"></label>
             <label class="note">Date of Birth<input type="date" id="ap-dob" class="txt" style="margin-top:5px;"></label>
           </div>
           
@@ -1410,6 +1410,21 @@ VIEWS['add-person'] = async (el, _param, my) => {
             <label class="note">Filer Status<select id="ap-filer" class="txt" style="font-family:var(--mono);font-size:12px;padding:9px 12px;width:100%;border:1.5px solid var(--line);background:var(--card);color:var(--ink);margin-top:5px;"><option value="Unknown">Unknown</option><option value="Filer">Filer</option><option value="Non-Filer">Non-Filer</option></select></label>
             <label class="note">Declared Income<input type="number" id="ap-income" value="0" class="txt" style="margin-top:5px;"></label>
           </div>
+
+          <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
+          <div class="eyebrow"><span class="en">Vehicle / Excise · optional</span><span class="ur">گاڑیوں کا ریکارڈ</span></div>
+          <div id="ap-vehicles"></div>
+          <button type="button" class="btn sm" id="ap-add-vehicle">+ Add another vehicle</button>
+
+          <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
+          <div class="eyebrow"><span class="en">Utilities / DISCO · optional</span><span class="ur">بجلی کا ریکارڈ</span></div>
+          <div id="ap-utilities"></div>
+          <button type="button" class="btn sm" id="ap-add-utility">+ Add another connection</button>
+
+          <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
+          <div class="eyebrow"><span class="en">Property · optional</span><span class="ur">جائیداد کا ریکارڈ</span></div>
+          <div id="ap-properties"></div>
+          <button type="button" class="btn sm" id="ap-add-property">+ Add another property</button>
           
           <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
           <div class="eyebrow"><span class="en">Portal Access</span><span class="ur">پورٹل رسائی</span></div>
@@ -1433,6 +1448,44 @@ VIEWS['add-person'] = async (el, _param, my) => {
   const prov = document.getElementById('ap-provision');
   const pwWrap = document.getElementById('ap-pw-wrap');
   const pw = document.getElementById('ap-password');
+
+  const addRepeatable = (containerId, template) => {
+    const container = document.getElementById(containerId);
+    const index = container.children.length;
+    const row = document.createElement('div');
+    row.className = 'card card-pad';
+    row.style.marginBottom = '10px';
+    row.innerHTML = template(index);
+    container.appendChild(row);
+    row.querySelector('[data-remove]').addEventListener('click', () => row.remove());
+  };
+  const vehicleTemplate = index => `
+    <div class="eyebrow"><span class="en">Vehicle ${index + 1}</span><button type="button" class="btn sm danger" data-remove>Remove</button></div>
+    <div class="ctl-grid">
+      <label class="note">Registration Number<input type="text" data-field="registration_number" class="txt" style="margin-top:5px;"></label>
+      <label class="note">Engine Capacity (cc)<input type="number" min="0" data-field="engine_capacity" class="txt" style="margin-top:5px;"></label>
+      <label class="note">Registration Date<input type="date" data-field="registration_date" class="txt" style="margin-top:5px;"></label>
+    </div>`;
+  const utilityTemplate = index => `
+    <div class="eyebrow"><span class="en">Connection ${index + 1}</span><button type="button" class="btn sm danger" data-remove>Remove</button></div>
+    <div class="ctl-grid">
+      <label class="note">Connection ID<input type="text" data-field="connection_id" class="txt" style="margin-top:5px;"></label>
+      <label class="note">Tariff Category<input type="text" data-field="tariff_category" class="txt" style="margin-top:5px;"></label>
+      <label class="note">Connection Date<input type="date" data-field="connection_date" class="txt" style="margin-top:5px;"></label>
+    </div>`;
+  const propertyTemplate = index => `
+    <div class="eyebrow"><span class="en">Property ${index + 1}</span><button type="button" class="btn sm danger" data-remove>Remove</button></div>
+    <div class="ctl-grid">
+      <label class="note">Location / Address<input type="text" data-field="address" class="txt" style="margin-top:5px;"></label>
+      <label class="note">Assessed Value (PKR)<input type="number" min="0" data-field="assessed_value" class="txt" style="margin-top:5px;"></label>
+    </div>`;
+  document.getElementById('ap-add-vehicle').addEventListener('click', () => addRepeatable('ap-vehicles', vehicleTemplate));
+  document.getElementById('ap-add-utility').addEventListener('click', () => addRepeatable('ap-utilities', utilityTemplate));
+  document.getElementById('ap-add-property').addEventListener('click', () => addRepeatable('ap-properties', propertyTemplate));
+
+  const collectRepeatable = containerId => [...document.querySelectorAll(`#${containerId} > .card`)].map(row =>
+    Object.fromEntries([...row.querySelectorAll('[data-field]')].map(input => [input.dataset.field, input.value.trim()]))
+  );
   
   prov.addEventListener('change', () => {
     pwWrap.style.display = prov.checked ? 'block' : 'none';
@@ -1454,7 +1507,10 @@ VIEWS['add-person'] = async (el, _param, my) => {
       declared_income: parseInt(document.getElementById('ap-income').value || '0', 10),
       provision_login: prov.checked,
       password: pw.value || null,
-      override_match: false
+      override_match: false,
+      vehicles: collectRepeatable('ap-vehicles'),
+      utilities: collectRepeatable('ap-utilities'),
+      properties: collectRepeatable('ap-properties')
     };
     
     btn.disabled = true;

@@ -542,6 +542,7 @@ def test_admin_add_person_is_visible_and_persistent(fresh_db, tmp_path):
 
     dashboard_data = tmp_path / "api_data.json"
     shutil.copyfile(data_module.DATA_PATH, dashboard_data)
+    baseline_count = len(json.load(open(dashboard_data, encoding="utf-8"))["profiles"])
     original_data_path = data_module.DATA_PATH
     original_main_data_path = main_module.DATA_PATH
     data_module.DATA_PATH = str(dashboard_data)
@@ -557,9 +558,9 @@ def test_admin_add_person_is_visible_and_persistent(fresh_db, tmp_path):
         "phone": "03009998877",
         "filer_status": "Non-Filer",
         "declared_income": 500000,
-        "vehicles": [],
-        "utilities": [],
-        "properties": [],
+        "vehicles": [{"registration_number": "ABC-123", "engine_capacity": "1300", "registration_date": "2024-01-15"}],
+        "utilities": [{"connection_id": "DISCO-001", "tariff_category": "Domestic", "connection_date": "2020-05-10"}],
+        "properties": [{"address": "Test Address Islamabad", "assessed_value": "2500000"}],
     }
 
     try:
@@ -570,21 +571,25 @@ def test_admin_add_person_is_visible_and_persistent(fresh_db, tmp_path):
                 entity_id = response.json()["entity_id"]
 
                 dashboard = client.get("/api/profiles?limit=6000", cookies=cookies).json()
-                assert dashboard["total"] == 5519
+                assert dashboard["total"] == baseline_count + 1
                 row = next(profile for profile in dashboard["profiles"] if profile["entity_id"] == entity_id)
                 assert row["name"] == payload["name"]
                 assert row["filer"] == "Non-Filer"
                 assert row["declared_income"] == 500000
-                assert row["lifestyle_income"] == 0
+                assert row["lifestyle_income"] == 125000
                 assert row["score"] == 0.0
                 assert row["tier"] == "MINIMAL"
+                saved = json.load(open(dashboard_data, encoding="utf-8"))["profiles"][-1]
+                assert saved["vehicles"] == payload["vehicles"]
+                assert saved["utilities"] == payload["utilities"]
+                assert saved["properties"] == payload["properties"]
 
         data_module._store = None
         with TestClient(app) as restarted_client:
             dashboard_after_restart = restarted_client.get(
                 "/api/profiles?limit=6000", cookies=cookies
             ).json()
-            assert dashboard_after_restart["total"] == 5519
+            assert dashboard_after_restart["total"] == baseline_count + 1
             assert any(
                 profile["entity_id"] == entity_id
                 for profile in dashboard_after_restart["profiles"]

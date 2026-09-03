@@ -854,25 +854,25 @@ async def admin_add_person(
     for idx, v in enumerate(req.vehicles):
         evidence.append({
             "source": "Excise", "record_id": f"MANUAL-V-{idx}", 
-            "finding": f"Owns {v.get('make', 'Vehicle')} ({v.get('cc', 0)}cc)",
+            "finding": f"Vehicle {v.get('registration_number', 'unregistered')} ({v.get('engine_capacity', 0)}cc)",
             "source_file": "manual", "row_number": 0
         })
     for idx, u in enumerate(req.utilities):
         evidence.append({
             "source": "DISCO", "record_id": f"MANUAL-U-{idx}", 
-            "finding": f"Average electricity bill Rs {u.get('avg_bill', 0)}/month ({u.get('tariff', '')})",
+            "finding": f"Connection {u.get('connection_id', 'unknown')} ({u.get('tariff_category', '')})",
             "source_file": "manual", "row_number": 0
         })
     for idx, pr in enumerate(req.properties):
         evidence.append({
             "source": "Registry", "record_id": f"MANUAL-P-{idx}", 
-            "finding": f"Owns property at {pr.get('address', '')} valued Rs {pr.get('value', 0)}",
+            "finding": f"Property at {pr.get('address', '')} valued Rs {pr.get('assessed_value', 0)}",
             "source_file": "manual", "row_number": 0
         })
 
-    avg_bill = sum(u.get("avg_bill", 0) for u in req.utilities) / max(len(req.utilities), 1) if req.utilities else 0
-    vehicle_value = sum(v.get("value", 0) for v in req.vehicles)
-    property_value = sum(pr.get("value", 0) for pr in req.properties)
+    avg_bill = 0
+    vehicle_value = 0
+    property_value = sum(float(pr.get("assessed_value") or 0) for pr in req.properties)
     lifestyle_income = round(
         (avg_bill * 12 / 0.06 if avg_bill else 0)
         + vehicle_value / 8
@@ -911,6 +911,9 @@ async def admin_add_person(
         "n_intl_trips": 0,
         "travel_spend": 0,
         "source": "manual_entry",
+        "vehicles": req.vehicles,
+        "utilities": req.utilities,
+        "properties": req.properties,
         "evidence": evidence,
         "timeline": [],
         "match_provenance": [],
