@@ -1407,7 +1407,7 @@ VIEWS['add-person'] = async (el, _param, my) => {
           <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
           <div class="eyebrow"><span class="en">Tax Record · optional</span><span class="ur">ٹیکس ریکارڈ</span></div>
           <div class="ctl-grid" style="margin-bottom:18px;">
-            <label class="note">Filer Status<input list="ap-filer-options" id="ap-filer" value="Unknown" class="txt" style="margin-top:5px;"><datalist id="ap-filer-options"><option value="Unknown"><option value="Filer"><option value="Non-Filer"></datalist></label>
+            <label class="note">Filer Status<select id="ap-filer" class="txt" style="font-family:var(--mono);font-size:12px;padding:9px 12px;width:100%;border:1.5px solid var(--line);background:var(--card);color:var(--ink);margin-top:5px;"><option value="Unknown">Unknown</option><option value="Filer">Filer</option><option value="Non-Filer">Non-Filer</option></select></label>
             <label class="note">Declared Income<input type="number" id="ap-income" value="0" class="txt" style="margin-top:5px;"></label>
           </div>
           

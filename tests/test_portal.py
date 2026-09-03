@@ -16,6 +16,7 @@ and data-store layers so they run offline without the pipeline output.
 import asyncio
 import json
 import os
+import shutil
 import sqlite3
 import sys
 import tempfile
@@ -529,3 +530,66 @@ class TestRateLimiting:
         # Verify status is still pending
         status = conn.execute("SELECT status FROM pending_registrations WHERE id=?", (reg_id,)).fetchone()[0]
         assert status == "pending"
+
+
+def test_admin_add_person_is_visible_and_persistent(fresh_db, tmp_path):
+    """A manual profile is immediately dashboard-visible and survives reload."""
+    import uuid as _uuid
+    import app.main as main_module
+    import app.portal_data as data_module
+    import app.portal_match as match_module
+    from app.portal_match import MatchResult
+
+    dashboard_data = tmp_path / "api_data.json"
+    shutil.copyfile(data_module.DATA_PATH, dashboard_data)
+    original_data_path = data_module.DATA_PATH
+    original_main_data_path = main_module.DATA_PATH
+    data_module.DATA_PATH = str(dashboard_data)
+    main_module.DATA_PATH = str(dashboard_data)
+    data_module._store = None
+
+    token = issue_token(str(_uuid.uuid4()), role="admin")
+    cookies = {"tn_portal_session": token}
+    payload = {
+        "name": "Test Dashboard Person",
+        "cnic": "3520112345678",
+        "address": "Test Address Islamabad",
+        "phone": "03009998877",
+        "filer_status": "Non-Filer",
+        "declared_income": 500000,
+        "vehicles": [],
+        "utilities": [],
+        "properties": [],
+    }
+
+    try:
+        with patch.object(match_module, "match_claim", return_value=MatchResult(outcome="no_match")):
+            with TestClient(app) as client:
+                response = client.post("/portal/admin/add-person", json=payload, cookies=cookies)
+                assert response.status_code == 200
+                entity_id = response.json()["entity_id"]
+
+                dashboard = client.get("/api/profiles?limit=6000", cookies=cookies).json()
+                assert dashboard["total"] == 5519
+                row = next(profile for profile in dashboard["profiles"] if profile["entity_id"] == entity_id)
+                assert row["name"] == payload["name"]
+                assert row["filer"] == "Non-Filer"
+                assert row["declared_income"] == 500000
+                assert row["lifestyle_income"] == 0
+                assert row["score"] == 0.0
+                assert row["tier"] == "MINIMAL"
+
+        data_module._store = None
+        with TestClient(app) as restarted_client:
+            dashboard_after_restart = restarted_client.get(
+                "/api/profiles?limit=6000", cookies=cookies
+            ).json()
+            assert dashboard_after_restart["total"] == 5519
+            assert any(
+                profile["entity_id"] == entity_id
+                for profile in dashboard_after_restart["profiles"]
+            )
+    finally:
+        data_module.DATA_PATH = original_data_path
+        main_module.DATA_PATH = original_main_data_path
+        data_module._store = None

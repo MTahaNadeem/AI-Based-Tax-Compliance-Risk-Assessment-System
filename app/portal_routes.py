@@ -817,16 +817,12 @@ async def admin_match_person(
         raise HTTPException(403, "Admin access required")
 
     from app.portal_match import match_claim
-    candidates = match_claim(
-        cnic=None,
-        name=req.name,
-        address=req.address,
-        phone=req.phone,
-        threshold=0.65
-    )
-    
-    if candidates:
-        best = candidates[0]
+    result = match_claim(req.name, req.address, req.phone)
+
+    if result.outcome == "match":
+        return {"match": True, "entity_id": result.entity_id, "score": 1.0}
+    if result.candidates:
+        best = result.candidates[0]
         return {"match": True, "entity_id": best["entity_id"], "score": best["score"]}
     return {"match": False}
 
@@ -843,9 +839,11 @@ async def admin_add_person(
 
     from app.portal_match import match_claim
     if not req.override_match:
-        candidates = match_claim(req.cnic, req.name, req.address, req.phone, threshold=0.65)
-        if candidates:
-            raise HTTPException(409, f"Person likely exists as {candidates[0]['entity_id']}. Override required.")
+        result = match_claim(req.name, req.address, req.phone)
+        if result.outcome == "match":
+            raise HTTPException(409, f"Person likely exists as {result.entity_id}. Override required.")
+        if result.candidates:
+            raise HTTPException(409, f"Person likely exists as {result.candidates[0]['entity_id']}. Override required.")
 
     from app.portal_data import get_store
     import uuid as _uuid
@@ -873,10 +871,23 @@ async def admin_add_person(
         })
 
     avg_bill = sum(u.get("avg_bill", 0) for u in req.utilities) / max(len(req.utilities), 1) if req.utilities else 0
+    vehicle_value = sum(v.get("value", 0) for v in req.vehicles)
+    property_value = sum(pr.get("value", 0) for pr in req.properties)
+    lifestyle_income = round(
+        (avg_bill * 12 / 0.06 if avg_bill else 0)
+        + vehicle_value / 8
+        + property_value / 20
+    )
 
     profile = {
         "entity_id": new_eid,
         "name": req.name,
+        "score": 0.0,
+        "tier": "MINIMAL",
+        "tier_ur": "معمولی",
+        "components": {},
+        "weights": {},
+        "comp_names": {},
         "cnic": req.cnic,
         "father_husband_name": req.father_husband_name,
         "dob": req.dob,
@@ -887,11 +898,26 @@ async def admin_add_person(
         "ntn": req.ntn,
         "filer": req.filer_status,
         "declared_income": req.declared_income,
+        "lifestyle_income": lifestyle_income,
+        "household_id": new_eid,
+        "household_members": 1,
+        "household_declared": req.declared_income,
         "n_vehicles": len(req.vehicles),
         "n_properties": len(req.properties),
         "avg_bill": avg_bill,
+        "n_sources": 1 + int(bool(req.vehicles) or bool(req.utilities) or bool(req.properties)),
+        "n_accounts": 0,
+        "annual_deposits": 0,
+        "n_intl_trips": 0,
+        "travel_spend": 0,
         "source": "manual_entry",
-        "evidence": evidence
+        "evidence": evidence,
+        "timeline": [],
+        "match_provenance": [],
+        "graph": {"nodes": [{"id": new_eid, "kind": "person", "label": req.name}], "links": []},
+        "audit": "This person was added manually and has not yet been scored by the pipeline.",
+        "audit_urdu": None,
+        "defensibility": "Manual entry pending validation and the next pipeline scoring run.",
     }
     
     store = get_store()

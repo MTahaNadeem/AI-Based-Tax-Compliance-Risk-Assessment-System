@@ -155,7 +155,7 @@ class PortalDataStore:
     def add_profile(self, profile: dict) -> None:
         """Add a new profile (e.g. manual admin entry) to memory and persist it."""
         eid = profile["entity_id"]
-        self._by_entity[eid] = profile
+        previous = self._by_entity.get(eid)
         
         # Rewrite the JSON file
         if not os.path.exists(DATA_PATH):
@@ -164,15 +164,25 @@ class PortalDataStore:
             with open(DATA_PATH, encoding="utf-8") as f:
                 data = json.load(f)
                 
-        for i, p in enumerate(data.get("profiles", [])):
+        profiles = data.setdefault("profiles", [])
+        for i, p in enumerate(profiles):
             if p.get("entity_id") == eid:
-                data["profiles"][i] = profile
+                profiles[i] = profile
                 break
         else:
-            data.setdefault("profiles", []).append(profile)
+            profiles.append(profile)
+
+        tiers = data.setdefault("tiers", {})
+        if previous and previous.get("tier") != profile.get("tier"):
+            old_tier = previous.get("tier")
+            tiers[old_tier] = max(0, tiers.get(old_tier, 0) - 1)
+        tier = profile.get("tier", "MINIMAL")
+        tiers[tier] = tiers.get(tier, 0) + (0 if previous else 1)
+        data.setdefault("er_stats", {})["n_entities"] = len(profiles)
             
         with open(DATA_PATH, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
+        self._by_entity[eid] = profile
 
     def get_citizen_profile(self, entity_id: str) -> Optional[dict]:
         """
