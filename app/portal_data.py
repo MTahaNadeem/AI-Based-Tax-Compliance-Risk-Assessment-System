@@ -152,6 +152,28 @@ class PortalDataStore:
     def get_entity_id_for_profile(self, entity_id: str) -> Optional[dict]:
         return self._by_entity.get(entity_id)
 
+    def add_profile(self, profile: dict) -> None:
+        """Add a new profile (e.g. manual admin entry) to memory and persist it."""
+        eid = profile["entity_id"]
+        self._by_entity[eid] = profile
+        
+        # Rewrite the JSON file
+        if not os.path.exists(DATA_PATH):
+            data = {"profiles": []}
+        else:
+            with open(DATA_PATH, encoding="utf-8") as f:
+                data = json.load(f)
+                
+        for i, p in enumerate(data.get("profiles", [])):
+            if p.get("entity_id") == eid:
+                data["profiles"][i] = profile
+                break
+        else:
+            data.setdefault("profiles", []).append(profile)
+            
+        with open(DATA_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
+
     def get_citizen_profile(self, entity_id: str) -> Optional[dict]:
         """
         Return a citizen-safe copy of the profile.

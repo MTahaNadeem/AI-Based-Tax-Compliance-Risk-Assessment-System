@@ -38,7 +38,7 @@ DDL = """
 CREATE TABLE IF NOT EXISTS users (
     uuid          TEXT PRIMARY KEY,
     entity_id     TEXT NOT NULL UNIQUE,
-    phone_hash    TEXT NOT NULL,
+    phone         TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );

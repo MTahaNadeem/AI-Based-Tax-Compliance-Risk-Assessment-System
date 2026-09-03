@@ -1378,6 +1378,127 @@ async function resolveReg(id, action, btn, candsJsonStr) {
   }
 }
 
+VIEWS['add-person'] = async (el, _param, my) => {
+  el.innerHTML = `
+    <div class="wrap view-enter">
+      <div class="pagehead">
+        <h2>Add Person</h2><span class="ur">شخص شامل کریں</span>
+        <div class="desc">Manually provision a full entity record (and optionally a portal account) for a citizen not found in existing data.</div>
+      </div>
+      <div class="card p-lg" style="max-width: 800px; margin: 0 auto;">
+        <form id="add-person-form">
+          <h3 style="margin-top:0;">Identity (Required)</h3>
+          <div style="display:flex; gap:16px; margin-bottom:12px;">
+            <label style="flex:1">Full Name * <input type="text" id="ap-name" required class="inp" style="width:100%"></label>
+            <label style="flex:1">Mobile Phone * <input type="text" id="ap-phone" placeholder="03XXXXXXXXX" pattern="^0[0-9]{10}$" required class="inp" style="width:100%"></label>
+          </div>
+          <div style="display:flex; gap:16px; margin-bottom:12px;">
+            <label style="flex:1">CNIC <input type="text" id="ap-cnic" placeholder="13 digits" pattern="^\\d{13}$" class="inp" style="width:100%"></label>
+            <label style="flex:1">Address * <input type="text" id="ap-address" required class="inp" style="width:100%"></label>
+          </div>
+          
+          <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
+          <h3 style="margin-top:0;">Additional Details (Optional)</h3>
+          <div style="display:flex; gap:16px; margin-bottom:12px;">
+            <label style="flex:1">Father/Husband Name <input type="text" id="ap-father" class="inp" style="width:100%"></label>
+            <label style="flex:1">Date of Birth <input type="date" id="ap-dob" class="inp" style="width:100%"></label>
+          </div>
+          
+          <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
+          <h3 style="margin-top:0;">Tax Record (Optional)</h3>
+          <div style="display:flex; gap:16px; margin-bottom:12px;">
+            <label style="flex:1">Filer Status 
+              <select id="ap-filer" class="inp" style="width:100%">
+                <option value="Unknown">Unknown</option>
+                <option value="Filer">Filer</option>
+                <option value="Non-Filer">Non-Filer</option>
+              </select>
+            </label>
+            <label style="flex:1">Declared Income <input type="number" id="ap-income" value="0" class="inp" style="width:100%"></label>
+          </div>
+          
+          <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
+          <h3 style="margin-top:0;">Portal Access</h3>
+          <label style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="ap-provision"> Provision Citizen Portal Account
+          </label>
+          <div id="ap-pw-wrap" style="display:none; margin-top:12px;">
+            <label>Temporary Password * <input type="password" id="ap-password" minlength="8" class="inp" style="width:100%; max-width: 400px;"></label>
+          </div>
+          
+          <div style="margin-top: 30px;">
+            <button type="submit" class="btn primary" id="ap-submit" style="padding: 10px 20px; font-size: 15px;">Search & Add Person</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  
+  const form = document.getElementById('add-person-form');
+  const prov = document.getElementById('ap-provision');
+  const pwWrap = document.getElementById('ap-pw-wrap');
+  const pw = document.getElementById('ap-password');
+  
+  prov.addEventListener('change', () => {
+    pwWrap.style.display = prov.checked ? 'block' : 'none';
+    pw.required = prov.checked;
+  });
+  
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = document.getElementById('ap-submit');
+    
+    const payload = {
+      name: document.getElementById('ap-name').value.trim(),
+      phone: document.getElementById('ap-phone').value.trim(),
+      cnic: document.getElementById('ap-cnic').value.trim() || null,
+      address: document.getElementById('ap-address').value.trim(),
+      father_husband_name: document.getElementById('ap-father').value.trim() || null,
+      dob: document.getElementById('ap-dob').value || null,
+      filer_status: document.getElementById('ap-filer').value,
+      declared_income: parseInt(document.getElementById('ap-income').value || '0', 10),
+      provision_login: prov.checked,
+      password: pw.value || null,
+      override_match: false
+    };
+    
+    btn.disabled = true;
+    btn.textContent = 'Searching...';
+    try {
+      const mr = await fetch('/portal/admin/match-person', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name: payload.name, address: payload.address, phone: payload.phone })
+      });
+      if (mr.ok) {
+        const mj = await mr.json();
+        if (mj.match) {
+          if (!confirm(\`Warning: This person likely already exists as Entity \${mj.entity_id}. Do you want to create a new entity anyway?\`)) {
+            btn.disabled = false;
+            btn.textContent = 'Search & Add Person';
+            return;
+          }
+          payload.override_match = true;
+        }
+      }
+      
+      btn.textContent = 'Creating...';
+      const r = await fetch('/portal/admin/add-person', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || r.statusText);
+      
+      toast('Person created successfully: ' + j.entity_id);
+      location.hash = '#/dashboard/' + j.entity_id;
+    } catch(err) {
+      toast('Failed: ' + err.message, 'err');
+      btn.disabled = false;
+      btn.textContent = 'Search & Add Person';
+    }
+  });
+};
+
 // Fetch and display logged-in official user info
 document.addEventListener('DOMContentLoaded', async () => {
   const userInfoEl = document.getElementById('official-user-info');

@@ -248,7 +248,34 @@ class AdminApproveRequest(BaseModel):
     entity_id: str = Field(...)
 
 class AdminRejectRequest(BaseModel):
-    reason: str = Field(...)
+    reason: str = Field(..., max_length=200)
+
+class AdminMatchPersonRequest(BaseModel):
+    name: str = Field(...)
+    address: str = Field(...)
+    phone: str = Field(...)
+
+class AdminAddPersonRequest(BaseModel):
+    name: str = Field(..., min_length=2)
+    cnic: Optional[str] = None
+    address: str = Field(...)
+    father_husband_name: Optional[str] = None
+    dob: Optional[str] = None
+    gender: Optional[str] = None
+    phone: str = Field(...)
+    email: Optional[str] = None
+    
+    ntn: Optional[str] = None
+    filer_status: str = "Unknown"
+    declared_income: int = 0
+    
+    vehicles: list = []
+    utilities: list = []
+    properties: list = []
+    
+    provision_login: bool = False
+    password: Optional[str] = None
+    override_match: bool = False
 
 # ================================================================== Routes
 
@@ -777,4 +804,123 @@ async def admin_me(request: Request):
 async def admin_logout(response: Response):
     response.delete_cookie(COOKIE_NAME, path="/", httponly=True, samesite="strict")
     return {"status": "logged_out"}
+
+@router.post("/admin/match-person", include_in_schema=False)
+async def admin_match_person(
+    req: AdminMatchPersonRequest,
+    token: str = Cookie(None, alias=COOKIE_NAME)
+):
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    p = verify_token(token)
+    if not p or p.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+
+    from app.portal_match import match_claim
+    candidates = match_claim(
+        cnic=None,
+        name=req.name,
+        address=req.address,
+        phone=req.phone,
+        threshold=0.65
+    )
+    
+    if candidates:
+        best = candidates[0]
+        return {"match": True, "entity_id": best["entity_id"], "score": best["score"]}
+    return {"match": False}
+
+@router.post("/admin/add-person", include_in_schema=False)
+async def admin_add_person(
+    req: AdminAddPersonRequest,
+    token: str = Cookie(None, alias=COOKIE_NAME)
+):
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    p = verify_token(token)
+    if not p or p.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+
+    from app.portal_match import match_claim
+    if not req.override_match:
+        candidates = match_claim(req.cnic, req.name, req.address, req.phone, threshold=0.65)
+        if candidates:
+            raise HTTPException(409, f"Person likely exists as {candidates[0]['entity_id']}. Override required.")
+
+    from app.portal_data import get_store
+    import uuid as _uuid
+    
+    new_eid = f"M{str(_uuid.uuid4())[:8].upper()}"
+    
+    evidence = []
+    for idx, v in enumerate(req.vehicles):
+        evidence.append({
+            "source": "Excise", "record_id": f"MANUAL-V-{idx}", 
+            "finding": f"Owns {v.get('make', 'Vehicle')} ({v.get('cc', 0)}cc)",
+            "source_file": "manual", "row_number": 0
+        })
+    for idx, u in enumerate(req.utilities):
+        evidence.append({
+            "source": "DISCO", "record_id": f"MANUAL-U-{idx}", 
+            "finding": f"Average electricity bill Rs {u.get('avg_bill', 0)}/month ({u.get('tariff', '')})",
+            "source_file": "manual", "row_number": 0
+        })
+    for idx, pr in enumerate(req.properties):
+        evidence.append({
+            "source": "Registry", "record_id": f"MANUAL-P-{idx}", 
+            "finding": f"Owns property at {pr.get('address', '')} valued Rs {pr.get('value', 0)}",
+            "source_file": "manual", "row_number": 0
+        })
+
+    avg_bill = sum(u.get("avg_bill", 0) for u in req.utilities) / max(len(req.utilities), 1) if req.utilities else 0
+
+    profile = {
+        "entity_id": new_eid,
+        "name": req.name,
+        "cnic": req.cnic,
+        "father_husband_name": req.father_husband_name,
+        "dob": req.dob,
+        "gender": req.gender,
+        "address": req.address,
+        "phone": req.phone,
+        "email": req.email,
+        "ntn": req.ntn,
+        "filer": req.filer_status,
+        "declared_income": req.declared_income,
+        "n_vehicles": len(req.vehicles),
+        "n_properties": len(req.properties),
+        "avg_bill": avg_bill,
+        "source": "manual_entry",
+        "evidence": evidence
+    }
+    
+    store = get_store()
+    store.add_profile(profile)
+    
+    conn = get_conn()
+    try:
+        conn.execute("BEGIN")
+        if req.provision_login:
+            if not req.password:
+                raise ValueError("Password required for login provisioning")
+            
+            user_uuid = str(_uuid.uuid4())
+            pw_hash = hash_password(req.password)
+            
+            existing = conn.execute("SELECT uuid FROM users WHERE phone=?", (req.phone,)).fetchone()
+            if existing:
+                raise ValueError("Phone number is already registered to a portal account.")
+            
+            conn.execute(
+                "INSERT INTO users (uuid, entity_id, phone, password_hash) VALUES (?,?,?,?)",
+                (user_uuid, new_eid, req.phone, pw_hash)
+            )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(400, f"Failed to provision account: {str(e)}")
+
+    _audit("admin_add_person", actor_uuid=p["sub"], actor_role="admin", entity_id=new_eid, detail={"provision_login": req.provision_login})
+
+    return {"status": "created", "entity_id": new_eid}
 

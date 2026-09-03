@@ -76,7 +76,7 @@ def _make_user(entity_id: str, phone: str = "03001111111", password: str = "pass
     ph_hash = hash_rate_key(phone)
     conn = get_conn()
     conn.execute(
-        "INSERT INTO users (uuid, entity_id, phone_hash, password_hash) VALUES (?,?,?,?)",
+        "INSERT INTO users (uuid, entity_id, phone, password_hash) VALUES (?,?,?,?)",
         (uid, entity_id, ph_hash, pw_hash)
     )
     conn.commit()
@@ -492,3 +492,40 @@ class TestRateLimiting:
             "phone": "03001234567", "password": "short",
         })
         assert r.status_code == 422
+
+    def test_approve_duplicate_entity_fails(self, client):
+        from app.portal_db import get_conn
+        from app.portal_auth import issue_token
+        import uuid as _uuid
+        
+        conn = get_conn()
+        
+        # 1. Create existing user
+        _make_user("E0001", phone="03001111111")
+        
+        # 2. Insert pending registration
+        conn.execute(
+            "INSERT INTO pending_registrations "
+            "(claimed_name, claimed_addr, phone_hash, password_hash, candidates, reason, status) "
+            "VALUES (?,?,?,?,?,?,?)",
+            ("Dup", "Addr", "hash1", "hash2", "[]", "ambiguous", "pending")
+        )
+        reg_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.commit()
+        
+        # 3. Create admin token
+        admin_token = issue_token(str(_uuid.uuid4()), role="admin")
+        
+        # 4. Attempt to approve mapping to E0001
+        r = client.post(
+            f"/portal/admin/pending-registrations/{reg_id}/approve",
+            json={"entity_id": "E0001"},
+            cookies={"tn_portal_session": admin_token}
+        )
+        
+        assert r.status_code == 409
+        assert "duplicate access" in r.json()["detail"]
+        
+        # Verify status is still pending
+        status = conn.execute("SELECT status FROM pending_registrations WHERE id=?", (reg_id,)).fetchone()[0]
+        assert status == "pending"
