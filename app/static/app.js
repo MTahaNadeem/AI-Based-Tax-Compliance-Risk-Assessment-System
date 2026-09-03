@@ -1207,3 +1207,145 @@ async function boot() {
   }
 }
 boot();
+
+/* ============================================================
+   VIEW · CITIZEN DISPUTES (auditor-side queue)
+   Routed via #/disputes in the auditor dashboard.
+   Uses the portal JWT cookie with role='auditor'.
+   For v1 demo: no auditor login is implemented; this view
+   calls the endpoint and shows the data if accessible.
+   ============================================================ */
+VIEWS.disputes = async (el, _param, my) => {
+  el.innerHTML = `<div class="wrap view-enter">${skeleton(4)}</div>`;
+  let data;
+  try {
+    const r = await fetch('/portal/admin/disputes?status_filter=all', { credentials: 'same-origin' });
+    if (r.status === 401 || r.status === 403) {
+      if (navStale(my)) return;
+      el.innerHTML = `<div class="wrap view-enter">
+        <div class="pagehead"><h2>Citizen Disputes</h2><span class="ur">شہری اعتراضات</span></div>
+        <div class="card card-pad" style="text-align:center;padding:40px">
+          <div style="font-size:15px;color:var(--mut);margin-bottom:8px">Auditor authentication required</div>
+          <div style="font-size:13px;color:var(--faint)">This panel requires an auditor session cookie (role=auditor).<br>
+          For demo purposes, set <code>PORTAL_JWT_SECRET</code> and issue an auditor token manually.</div>
+        </div>
+      </div>`;
+      return;
+    }
+    data = await r.json();
+  } catch(err) {
+    if (navStale(my)) return;
+    el.innerHTML = `<div class="wrap">${errorPanel(err.message, '#/disputes')}</div>`;
+    return;
+  }
+  if (navStale(my)) return;
+
+  const disputes = data.disputes || [];
+  const pending  = data.pending_registrations || [];
+
+  const statusBadge = s => {
+    const map = { pending:'med', accepted:'ok', rejected:'bad', info_requested:'warn' };
+    return `<span class="pill ${map[s]||''}">${esc(s.replace('_',' '))}</span>`;
+  };
+
+  el.innerHTML = `<div class="wrap view-enter">
+    <div class="pagehead">
+      <h2>Citizen Disputes</h2><span class="ur">شہری اعتراضات</span>
+      <div class="desc">
+        Dispute tickets submitted by citizens through the People's Portal, plus
+        registration attempts that could not be auto-matched.
+        Disputes do <b>not</b> alter scores directly — an accepted dispute creates a
+        manual override record for the next pipeline run.
+      </div>
+    </div>
+
+    <div class="card card-pad" style="margin-bottom:16px">
+      <div class="eyebrow"><span class="en">Pending Registrations (${pending.length})</span></div>
+      <div class="note" style="margin-bottom:12px">
+        Identity claims that matched ambiguously during registration.
+        Approve to provision a portal account; reject to decline.
+      </div>
+      ${pending.length === 0 ? '<div class="note">No pending registrations.</div>' :
+        `<table class="ev-tbl" style="width:100%">
+          <thead><tr><th>ID</th><th>Claimed name</th><th>Reason</th><th>Candidates</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody>
+          ${pending.map(p => {
+            const cands = JSON.parse(p.candidates || '[]');
+            return `<tr>
+              <td style="font-family:var(--mono);font-size:11px">#${p.id}</td>
+              <td>${esc(p.claimed_name)}</td>
+              <td><span class="pill">${esc(p.reason?.replace(/_/g,' ')||'')}</span></td>
+              <td style="font-size:12px;font-family:var(--mono)">${cands.map(c=>`${c.entity_id} (${c.score})`).join('<br>')}</td>
+              <td style="font-size:12px">${esc((p.created_at||'').slice(0,10))}</td>
+              <td>
+                <button class="btn" style="font-size:11.5px;padding:4px 10px;margin-right:4px"
+                  onclick="resolveReg(${p.id},'approve',this)">Approve</button>
+                <button class="btn danger" style="font-size:11.5px;padding:4px 10px"
+                  onclick="resolveReg(${p.id},'reject',this)">Reject</button>
+              </td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table>`
+      }
+    </div>
+
+    <div class="card card-pad">
+      <div class="eyebrow"><span class="en">Dispute Tickets (${disputes.length})</span></div>
+      ${disputes.length === 0 ? '<div class="note">No dispute tickets yet.</div>' :
+        `<table class="ev-tbl" style="width:100%">
+          <thead><tr><th>ID</th><th>Source · Record</th><th>Finding</th><th>Category</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody>
+          ${disputes.map(d => `<tr>
+            <td style="font-family:var(--mono);font-size:11px">#${d.id}</td>
+            <td style="font-family:var(--mono);font-size:11px">${esc(d.source)}<br>${esc(d.record_id)}</td>
+            <td style="font-size:12.5px;max-width:200px">${esc(d.finding)}</td>
+            <td style="font-size:12px">${esc((d.category||'').replace(/_/g,' '))}</td>
+            <td>${statusBadge(d.status)}</td>
+            <td style="font-size:12px">${esc((d.created_at||'').slice(0,10))}</td>
+            <td style="white-space:nowrap">
+              ${d.status === 'pending' ? `
+                <button class="btn" style="font-size:11px;padding:3px 8px;margin:2px"
+                  onclick="resolveDisp(${d.id},'accept',this)">Accept</button>
+                <button class="btn danger" style="font-size:11px;padding:3px 8px;margin:2px"
+                  onclick="resolveDisp(${d.id},'reject',this)">Reject</button>
+                <button class="btn" style="font-size:11px;padding:3px 8px;margin:2px;background:var(--high)"
+                  onclick="resolveDisp(${d.id},'info_requested',this)">Ask info</button>
+              ` : '<span class="note">Resolved</span>'}
+            </td>
+          </tr>`).join('')}
+          </tbody>
+        </table>`
+      }
+    </div>
+  </div>`;
+};
+
+async function resolveDisp(id, action, btn) {
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    await fetch(`/portal/admin/disputes/${id}?action=${encodeURIComponent(action)}`, {
+      method: 'PATCH', credentials: 'same-origin'
+    });
+    toast(`Dispute #${id} ${action.replace('_',' ')}.`);
+    VIEWS.disputes(document.getElementById('view'), null, NAV_SEQ);
+  } catch(e) {
+    btn.disabled = false; btn.textContent = action;
+    toast('Action failed: ' + e.message, 'err');
+  }
+}
+
+async function resolveReg(id, action, btn) {
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    await fetch(`/portal/admin/pending/${id}?action=${encodeURIComponent(action)}`, {
+      method: 'PATCH', credentials: 'same-origin'
+    });
+    toast(`Registration #${id} ${action}d.`);
+    VIEWS.disputes(document.getElementById('view'), null, NAV_SEQ);
+  } catch(e) {
+    btn.disabled = false; btn.textContent = action;
+    toast('Action failed: ' + e.message, 'err');
+  }
+}
+

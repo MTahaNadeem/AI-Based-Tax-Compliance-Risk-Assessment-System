@@ -1,11 +1,16 @@
 """
 TaxNet Graph — API + dashboard server.
-Run:  uvicorn app.main:app --port 8000   ->  http://localhost:8000
+Run:  uvicorn app.main:app --port 8005   ->  http://localhost:8005
+
+Two surfaces on one process:
+  /          → Auditor dashboard (existing)
+  /portal    → Citizens' People's Portal (new)
 """
 import csv
 import io
 import json
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
@@ -14,7 +19,22 @@ from fastapi.staticfiles import StaticFiles
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(HERE, "..", "outputs", "api_data.json")
 
-app = FastAPI(title="TaxNet Graph API", version="2.0")
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    """Startup: initialise portal DB and prime the matching index."""
+    from .portal_db import init_db
+    from .portal_data import get_store
+    from .portal_match import init_matching
+    init_db()
+    store = get_store()   # loads api_data.json into memory
+    profiles = list(store._by_entity.values()) if store.is_loaded() else []
+    init_matching(profiles)
+    yield
+    # (shutdown — nothing to clean up)
+
+
+app = FastAPI(title="TaxNet Graph API", version="2.0", lifespan=lifespan)
 
 def load():
     if not os.path.exists(DATA_PATH):
@@ -177,5 +197,16 @@ def sources():
 @app.get("/")
 def index():
     return FileResponse(os.path.join(HERE, "static", "index.html"))
+
+
+@app.get("/portal", include_in_schema=False)
+@app.get("/portal/", include_in_schema=False)
+def portal_index():
+    return FileResponse(os.path.join(HERE, "static", "portal.html"))
+
+
+# Register portal routes
+from .portal_routes import router as portal_router  # noqa: E402
+app.include_router(portal_router)
 
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static")

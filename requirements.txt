@@ -7,3 +7,5 @@ torch_geometric
 fastapi
 uvicorn
 numpy
+PyJWT
+bcrypt

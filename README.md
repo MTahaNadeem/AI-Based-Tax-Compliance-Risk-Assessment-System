@@ -129,3 +129,90 @@ python pipeline/run_pipeline.py                       # official 4-CSV mode
 cp data/plugins/banking_accounts.csv data/plugins/travel_logs.csv data/
 python pipeline/run_pipeline.py                       # banking + travel light up live
 ```
+
+---
+
+## People's Portal (Citizens' Portal)
+
+A separate, citizen-facing web surface accessible at **`/portal`** on the same server instance.
+
+```
+uvicorn app.main:app --port 8005
+# Auditor dashboard:  http://localhost:8005/
+# Citizens' portal:   http://localhost:8005/portal
+```
+
+### What it does
+- Citizens register with their name, address, phone number, and CNIC.
+- The server matches the claim against FBR records using the same `entity_resolution.py`
+  blocking and scoring logic (no new matching code).
+- Three outcomes are possible:
+  1. **Unique match** → account provisioned, citizen sees their profile.
+  2. **Ambiguous match** → claim routed to auditor's Citizen Disputes queue for manual review.
+  3. **No match** → neutral holding message (no confirmation/denial of CNIC existence).
+- Authenticated citizens see a stripped, plain-language version of their profile —
+  risk score, sub-score components, household data, and graph structure are withheld.
+- Citizens can dispute individual evidence records; disputes create review tickets
+  that appear in the auditor dashboard under **Citizen Disputes**.
+
+### Database
+Portal auth and dispute data lives in `outputs/portal.db` (SQLite, separate from `data/`
+which holds raw pipeline CSVs). On first startup, all tables are created automatically.
+
+> **Note:** `outputs/portal.db` must be excluded from version control and backed up
+> separately. Add `outputs/portal.db` to `.gitignore`.
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORTAL_JWT_SECRET` | `CHANGE-ME-in-production-min-32-bytes!` | JWT signing secret. **Must be changed** before any real deployment. |
+| `PORTAL_RL_PEPPER` | *(weak default)* | HMAC pepper for rate-limit key derivation. **Must be set** in production. |
+| `PORTAL_TIMING_FLOOR` | `0.8` | Minimum response time in seconds for all registration outcomes (enumeration mitigation). |
+| `PORTAL_DB_PATH` | `outputs/portal.db` | Override DB path (e.g. for Docker volume mounts). |
+
+### Security design decisions
+
+**Password hashing:** bcrypt, cost factor 12.
+
+**Rate-limit key hashing:** Low-entropy inputs (phone, CNIC) are hashed with
+bcrypt cost=10 applied to HMAC-SHA256(pepper, input). Plain SHA-256 is
+not used because the CNIC/phone space (~10¹³) is brute-forceable with GPU hardware.
+
+**Timing floor:** All three registration outcomes (match, ambiguous, no-match) return
+in ≥ 800 ms to prevent timing-based enumeration of whether a CNIC exists.
+
+**JWT storage:** `httpOnly; SameSite=Strict` cookie. Never `localStorage`.
+Token lifetime 30 minutes with sliding renewal.
+
+**IDOR protection:** All citizen endpoints derive identity from the JWT `sub` claim
+server-side. No `entity_id` or other internal identifier is accepted from the client.
+Internal `entity_id` values are never sent to the browser.
+
+### ⚠ Accepted security risk — v1 ships password-only authentication
+
+This is a **known and accepted gap** for a financial-data-adjacent citizen portal.
+v1 does not implement OTP or a second authentication factor.
+
+**Risk:** A compromised password is sufficient for an attacker to view a citizen's
+linked government records. For a system that surfaces FBR filing status, vehicle
+registrations, and electricity bills, this is a material risk.
+
+**Why deferred:** An SMS provider decision (Twilio, Telenor Pakistan bulk-SMS, or
+equivalent) is required before implementation. The phone column is stored at
+registration so OTP can be retrofitted in v2 without a schema change.
+
+**Mitigation in v1:** bcrypt-12 passwords, per-IP + per-phone rate limiting with
+lockout, 30-minute JWT lifetime, httpOnly cookies.
+
+### No NADRA integration (v1 permanent assumption)
+Identity matching is done purely against the four pipeline datasets (FBR, Excise,
+DISCO, Property Registry). There is no live CNIC verification against NADRA.
+Citizens whose records exist only in datasets other than FBR may not match.
+The no-match path is designed as a permanent outcome, not a temporary gap.
+
+### Running tests
+```bash
+pip install pytest httpx
+python -m pytest tests/test_portal.py -v
+```
