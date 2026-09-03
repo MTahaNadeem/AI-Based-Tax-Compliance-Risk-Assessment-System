@@ -653,6 +653,7 @@ function renderDossier(box, p) {
           <span class="tag ${p.filer === 'Non-Filer' || p.filer === 'Unknown' ? 'bad' : ''}">${p.filer === 'Unknown' ? 'No FBR record linked' : esc(p.filer)}</span>
           <span class="tag">${p.n_vehicles} vehicle(s)</span>
           <span class="tag">${p.n_properties} property record(s)</span>
+          ${p.n_utilities ? `<span class="tag">${p.n_utilities} DISCO connection(s)</span>` : ''}
           ${p.household_members > 1 ? `<span class="tag bad">household of ${p.household_members}</span>` : ''}
           ${p.n_accounts ? `<span class="tag">${p.n_accounts} bank account(s)</span>` : ''}
           ${p.n_intl_trips ? `<span class="tag">${p.n_intl_trips} intl trip(s)</span>` : ''}
@@ -701,6 +702,7 @@ function renderDossier(box, p) {
     <section class="blk">
       <div class="eyebrow"><span class="en">Score Composition · ${compKeys.length} components</span><span class="ur">اسکور کی ترکیب</span>
         <span class="end note">weights renormalised over present components</span></div>
+      ${p.source === 'manual_entry' && !compKeys.length ? '<div class="note" style="margin-bottom:12px">Not yet scored — pending the next pipeline run.</div>' : ''}
       <div class="compgrid">
         ${compKeys.map(k => `
         <div class="ccard"><div class="h">${esc(k)} · ${esc((p.comp_names[k] || [k])[0])}</div>
@@ -1394,6 +1396,7 @@ VIEWS['add-person'] = async (el, _param, my) => {
           </div>
           <div class="ctl-grid" style="margin-bottom:18px;">
             <label class="note">CNIC<input type="text" id="ap-cnic" placeholder="13 digits" pattern="^\\d{13}$" class="txt" style="margin-top:5px;"></label>
+            <label class="note">NTN<input type="text" id="ap-ntn" class="txt" style="margin-top:5px;"></label>
             <label class="note">Address *<input type="text" id="ap-address" required class="txt" style="margin-top:5px;"></label>
           </div>
           
@@ -1406,10 +1409,9 @@ VIEWS['add-person'] = async (el, _param, my) => {
           
           <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
           <div class="eyebrow"><span class="en">Tax Record · optional</span><span class="ur">ٹیکس ریکارڈ</span></div>
-          <div class="ctl-grid" style="margin-bottom:18px;">
-            <label class="note">Filer Status<select id="ap-filer" class="txt" style="font-family:var(--mono);font-size:12px;padding:9px 12px;width:100%;border:1.5px solid var(--line);background:var(--card);color:var(--ink);margin-top:5px;"><option value="Unknown">Unknown</option><option value="Filer">Filer</option><option value="Non-Filer">Non-Filer</option></select></label>
-            <label class="note">Declared Income<input type="number" id="ap-income" value="0" class="txt" style="margin-top:5px;"></label>
-          </div>
+          <label class="note">Filer Status<select id="ap-filer" class="txt" style="font-family:var(--mono);font-size:12px;padding:9px 12px;width:100%;border:1.5px solid var(--line);background:var(--card);color:var(--ink);margin-top:5px;"><option value="Unknown">Unknown</option><option value="Filer">Filer</option><option value="Non-Filer">Non-Filer</option></select></label>
+          <div id="ap-tax-returns"></div>
+          <button type="button" class="btn sm" id="ap-add-tax-return">+ Add another tax return</button>
 
           <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
           <div class="eyebrow"><span class="en">Vehicle / Excise · optional</span><span class="ur">گاڑیوں کا ریکارڈ</span></div>
@@ -1425,6 +1427,15 @@ VIEWS['add-person'] = async (el, _param, my) => {
           <div class="eyebrow"><span class="en">Property · optional</span><span class="ur">جائیداد کا ریکارڈ</span></div>
           <div id="ap-properties"></div>
           <button type="button" class="btn sm" id="ap-add-property">+ Add another property</button>
+
+          <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
+          <div class="eyebrow"><span class="en">Household Link · optional</span><span class="ur">خاندانی ربط</span></div>
+          <div class="ctl-grid">
+            <label class="note">Search household ID, member name, or address<input type="search" id="ap-household-query" class="txt" autocomplete="off" style="margin-top:5px;"></label>
+            <div><button type="button" class="btn sm" id="ap-household-search" style="margin-top:18px;">Search households</button></div>
+          </div>
+          <div id="ap-household-results" class="note" style="margin-top:10px;"></div>
+          <div id="ap-household-selected" class="note" style="margin-top:8px;"></div>
           
           <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
           <div class="eyebrow"><span class="en">Portal Access</span><span class="ur">پورٹل رسائی</span></div>
@@ -1448,6 +1459,9 @@ VIEWS['add-person'] = async (el, _param, my) => {
   const prov = document.getElementById('ap-provision');
   const pwWrap = document.getElementById('ap-pw-wrap');
   const pw = document.getElementById('ap-password');
+  const father = document.getElementById('ap-father');
+  father.value = '';
+  requestAnimationFrame(() => { father.value = ''; });
 
   const addRepeatable = (containerId, template) => {
     const container = document.getElementById(containerId);
@@ -1459,18 +1473,29 @@ VIEWS['add-person'] = async (el, _param, my) => {
     container.appendChild(row);
     row.querySelector('[data-remove]').addEventListener('click', () => row.remove());
   };
+  const taxReturnTemplate = index => `
+    <div class="eyebrow"><span class="en">Tax Return ${index + 1}</span><button type="button" class="btn sm danger" data-remove>Remove</button></div>
+    <div class="ctl-grid">
+      <label class="note">Tax Year<input type="text" data-field="tax_year" placeholder="2024" class="txt" style="margin-top:5px;"></label>
+      <label class="note">Return Reference<input type="text" data-field="return_reference" class="txt" style="margin-top:5px;"></label>
+      <label class="note">Declared Income (PKR)<input type="number" min="0" data-field="declared_income" class="txt" style="margin-top:5px;"></label>
+      <label class="note">Tax Paid (PKR)<input type="number" min="0" data-field="tax_paid" class="txt" style="margin-top:5px;"></label>
+    </div>`;
   const vehicleTemplate = index => `
     <div class="eyebrow"><span class="en">Vehicle ${index + 1}</span><button type="button" class="btn sm danger" data-remove>Remove</button></div>
     <div class="ctl-grid">
       <label class="note">Registration Number<input type="text" data-field="registration_number" class="txt" style="margin-top:5px;"></label>
       <label class="note">Engine Capacity (cc)<input type="number" min="0" data-field="engine_capacity" class="txt" style="margin-top:5px;"></label>
+      <label class="note">Make / Model<input type="text" data-field="make_model" class="txt" style="margin-top:5px;"></label>
       <label class="note">Registration Date<input type="date" data-field="registration_date" class="txt" style="margin-top:5px;"></label>
     </div>`;
   const utilityTemplate = index => `
     <div class="eyebrow"><span class="en">Connection ${index + 1}</span><button type="button" class="btn sm danger" data-remove>Remove</button></div>
     <div class="ctl-grid">
       <label class="note">Connection ID<input type="text" data-field="connection_id" class="txt" style="margin-top:5px;"></label>
+      <label class="note">Meter Number<input type="text" data-field="meter_number" class="txt" style="margin-top:5px;"></label>
       <label class="note">Tariff Category<input type="text" data-field="tariff_category" class="txt" style="margin-top:5px;"></label>
+      <label class="note">Monthly Bill (PKR)<input type="number" min="0" data-field="monthly_bill" class="txt" style="margin-top:5px;"></label>
       <label class="note">Connection Date<input type="date" data-field="connection_date" class="txt" style="margin-top:5px;"></label>
     </div>`;
   const propertyTemplate = index => `
@@ -1478,10 +1503,34 @@ VIEWS['add-person'] = async (el, _param, my) => {
     <div class="ctl-grid">
       <label class="note">Location / Address<input type="text" data-field="address" class="txt" style="margin-top:5px;"></label>
       <label class="note">Assessed Value (PKR)<input type="number" min="0" data-field="assessed_value" class="txt" style="margin-top:5px;"></label>
+      <label class="note">Property Type<input type="text" data-field="property_type" class="txt" style="margin-top:5px;"></label>
+      <label class="note">Area (marla)<input type="number" min="0" step="0.01" data-field="area_marla" class="txt" style="margin-top:5px;"></label>
+      <label class="note">Acquisition Date<input type="date" data-field="transfer_date" class="txt" style="margin-top:5px;"></label>
     </div>`;
   document.getElementById('ap-add-vehicle').addEventListener('click', () => addRepeatable('ap-vehicles', vehicleTemplate));
   document.getElementById('ap-add-utility').addEventListener('click', () => addRepeatable('ap-utilities', utilityTemplate));
   document.getElementById('ap-add-property').addEventListener('click', () => addRepeatable('ap-properties', propertyTemplate));
+  document.getElementById('ap-add-tax-return').addEventListener('click', () => addRepeatable('ap-tax-returns', taxReturnTemplate));
+
+  let selectedHouseholdId = null;
+  const householdQuery = document.getElementById('ap-household-query');
+  const householdResults = document.getElementById('ap-household-results');
+  const householdSelected = document.getElementById('ap-household-selected');
+  document.getElementById('ap-household-search').addEventListener('click', async () => {
+    householdResults.textContent = 'Searching...';
+    try {
+      const r = await fetch('/portal/admin/households?q=' + encodeURIComponent(householdQuery.value.trim()));
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || r.statusText);
+      householdResults.innerHTML = (data.households || []).map(h =>
+        `<button type="button" class="btn sm" data-household="${esc(h.household_id)}" style="display:block;margin:5px 0;text-align:left;width:100%;">${esc(h.household_id)} · ${esc(h.members.join(', '))}${h.address ? ' · ' + esc(h.address) : ''}</button>`
+      ).join('') || 'No households found.';
+      householdResults.querySelectorAll('[data-household]').forEach(button => button.addEventListener('click', () => {
+        selectedHouseholdId = button.dataset.household;
+        householdSelected.textContent = 'Selected household: ' + selectedHouseholdId;
+      }));
+    } catch (err) { householdResults.textContent = 'Household search failed: ' + err.message; }
+  });
 
   const collectRepeatable = containerId => [...document.querySelectorAll(`#${containerId} > .card`)].map(row =>
     Object.fromEntries([...row.querySelectorAll('[data-field]')].map(input => [input.dataset.field, input.value.trim()]))
@@ -1500,17 +1549,20 @@ VIEWS['add-person'] = async (el, _param, my) => {
       name: document.getElementById('ap-name').value.trim(),
       phone: document.getElementById('ap-phone').value.trim(),
       cnic: document.getElementById('ap-cnic').value.trim() || null,
+      ntn: document.getElementById('ap-ntn').value.trim() || null,
       address: document.getElementById('ap-address').value.trim(),
       father_husband_name: document.getElementById('ap-father').value.trim() || null,
       dob: document.getElementById('ap-dob').value || null,
       filer_status: document.getElementById('ap-filer').value,
-      declared_income: parseInt(document.getElementById('ap-income').value || '0', 10),
+      tax_returns: collectRepeatable('ap-tax-returns'),
       provision_login: prov.checked,
       password: pw.value || null,
       override_match: false,
       vehicles: collectRepeatable('ap-vehicles'),
       utilities: collectRepeatable('ap-utilities'),
-      properties: collectRepeatable('ap-properties')
+      properties: collectRepeatable('ap-properties'),
+      household_id: selectedHouseholdId,
+      household_manual_association: Boolean(selectedHouseholdId)
     };
     
     btn.disabled = true;

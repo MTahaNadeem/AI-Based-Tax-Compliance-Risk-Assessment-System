@@ -554,13 +554,16 @@ def test_admin_add_person_is_visible_and_persistent(fresh_db, tmp_path):
     payload = {
         "name": "Test Dashboard Person",
         "cnic": "3520112345678",
+        "ntn": "1234567-8",
         "address": "Test Address Islamabad",
         "phone": "03009998877",
         "filer_status": "Non-Filer",
-        "declared_income": 500000,
-        "vehicles": [{"registration_number": "ABC-123", "engine_capacity": "1300", "registration_date": "2024-01-15"}],
-        "utilities": [{"connection_id": "DISCO-001", "tariff_category": "Domestic", "connection_date": "2020-05-10"}],
-        "properties": [{"address": "Test Address Islamabad", "assessed_value": "2500000"}],
+        "tax_returns": [{"tax_year": "2024", "return_reference": "FBR-2024-001", "declared_income": 500000, "tax_paid": 60000}],
+        "vehicles": [{"registration_number": "ABC-123", "engine_capacity": 1300, "registration_date": "2024-01-15", "make_model": "Toyota Corolla Altis"}],
+        "utilities": [{"connection_id": "DISCO-001", "meter_number": "MTR-001", "tariff_category": "Domestic", "monthly_bill": 12000, "connection_date": "2020-05-10"}],
+        "properties": [{"address": "Test Address Islamabad", "assessed_value": 2500000, "property_type": "Residential plot", "area_marla": 40, "transfer_date": "2023-11-23"}],
+        "household_id": "H3450",
+        "household_manual_association": True,
     }
 
     try:
@@ -576,13 +579,25 @@ def test_admin_add_person_is_visible_and_persistent(fresh_db, tmp_path):
                 assert row["name"] == payload["name"]
                 assert row["filer"] == "Non-Filer"
                 assert row["declared_income"] == 500000
-                assert row["lifestyle_income"] == 125000
+                assert row["lifestyle_income"] == 2525000
                 assert row["score"] == 0.0
                 assert row["tier"] == "MINIMAL"
                 saved = json.load(open(dashboard_data, encoding="utf-8"))["profiles"][-1]
                 assert saved["vehicles"] == payload["vehicles"]
                 assert saved["utilities"] == payload["utilities"]
                 assert saved["properties"] == payload["properties"]
+                assert saved["tax_returns"] == payload["tax_returns"]
+                assert saved["tax_paid"] == 60000
+                assert saved["ntn"] == payload["ntn"]
+                assert saved["household_id"] == "H3450"
+                assert saved["household_manual_association"] is True
+                assert saved["n_utilities"] == 1
+                findings = [item["finding"] for item in saved["evidence"]]
+                assert "Toyota Corolla Altis ABC-123 (1300cc, reg. 2024-01-15)" in findings[1]
+                assert "MTR-001" in findings[2] and "Domestic" in findings[2] and "Rs 12000" in findings[2]
+                assert "40.0-marla Residential plot" in findings[3] and "Rs 2500000" in findings[3]
+                assert {node["kind"] for node in saved["graph"]["nodes"]} == {"person", "tax_return", "vehicle", "meter", "property"}
+                assert {link["rel"] for link in saved["graph"]["links"]} == {"filed", "owns", "consumes_via", "purchased_by"}
 
         data_module._store = None
         with TestClient(app) as restarted_client:

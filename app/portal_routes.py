@@ -255,6 +255,36 @@ class AdminMatchPersonRequest(BaseModel):
     address: str = Field(...)
     phone: str = Field(...)
 
+class TaxReturnEntry(BaseModel):
+    tax_year: str = Field(..., min_length=1, max_length=20)
+    return_reference: Optional[str] = None
+    declared_income: int = 0
+    tax_paid: int = 0
+
+
+class VehicleEntry(BaseModel):
+    registration_number: str = ""
+    engine_capacity: int = 0
+    registration_date: Optional[str] = None
+    make_model: Optional[str] = None
+
+
+class UtilityEntry(BaseModel):
+    connection_id: Optional[str] = None
+    meter_number: Optional[str] = None
+    tariff_category: Optional[str] = None
+    monthly_bill: int = 0
+    connection_date: Optional[str] = None
+
+
+class PropertyEntry(BaseModel):
+    address: str = ""
+    assessed_value: int = 0
+    property_type: Optional[str] = None
+    area_marla: Optional[float] = None
+    transfer_date: Optional[str] = None
+
+
 class AdminAddPersonRequest(BaseModel):
     name: str = Field(..., min_length=2)
     cnic: Optional[str] = None
@@ -267,11 +297,12 @@ class AdminAddPersonRequest(BaseModel):
     
     ntn: Optional[str] = None
     filer_status: str = "Unknown"
-    declared_income: int = 0
-    
-    vehicles: list = []
-    utilities: list = []
-    properties: list = []
+    tax_returns: list[TaxReturnEntry] = Field(default_factory=list)
+    vehicles: list[VehicleEntry] = Field(default_factory=list)
+    utilities: list[UtilityEntry] = Field(default_factory=list)
+    properties: list[PropertyEntry] = Field(default_factory=list)
+    household_id: Optional[str] = None
+    household_manual_association: bool = False
     
     provision_login: bool = False
     password: Optional[str] = None
@@ -826,6 +857,41 @@ async def admin_match_person(
         return {"match": True, "entity_id": best["entity_id"], "score": best["score"]}
     return {"match": False}
 
+
+@router.get("/admin/households", include_in_schema=False)
+async def admin_households(
+    q: str = "",
+    token: str = Cookie(None, alias=COOKIE_NAME),
+):
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    p = verify_token(token)
+    if not p or p.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+
+    query = q.strip().lower()
+    groups = {}
+    for profile in get_store()._by_entity.values():
+        household_id = profile.get("household_id")
+        if not household_id:
+            continue
+        group = groups.setdefault(household_id, {"household_id": household_id, "members": [], "addresses": set()})
+        group["members"].append(profile.get("name", ""))
+        if profile.get("address"):
+            group["addresses"].add(profile["address"])
+
+    results = []
+    for group in groups.values():
+        address = "; ".join(sorted(group["addresses"]))
+        haystack = " ".join([group["household_id"], address, *group["members"]]).lower()
+        if not query or query in haystack:
+            results.append({
+                "household_id": group["household_id"],
+                "members": sorted(group["members"]),
+                "address": address,
+            })
+    return {"households": sorted(results, key=lambda x: x["household_id"])[:25]}
+
 @router.post("/admin/add-person", include_in_schema=False)
 async def admin_add_person(
     req: AdminAddPersonRequest,
@@ -850,34 +916,80 @@ async def admin_add_person(
     
     new_eid = f"M{str(_uuid.uuid4())[:8].upper()}"
     
+    tax_returns = [entry.model_dump() for entry in req.tax_returns]
+    vehicles = [entry.model_dump() for entry in req.vehicles]
+    utilities = [entry.model_dump() for entry in req.utilities]
+    properties = [entry.model_dump() for entry in req.properties]
+    declared_income = sum(entry["declared_income"] for entry in tax_returns)
+    tax_paid = sum(entry["tax_paid"] for entry in tax_returns)
+
     evidence = []
-    for idx, v in enumerate(req.vehicles):
+    for idx, tax_return in enumerate(tax_returns):
+        evidence.append({
+            "source": "FBR", "record_id": tax_return.get("return_reference") or f"MANUAL-FBR-{idx}",
+            "finding": f"Tax year {tax_return['tax_year']}; declared income Rs {tax_return['declared_income']}; tax paid Rs {tax_return['tax_paid']}",
+            "source_file": "manual", "row_number": 0
+        })
+    for idx, v in enumerate(vehicles):
         evidence.append({
             "source": "Excise", "record_id": f"MANUAL-V-{idx}", 
-            "finding": f"Vehicle {v.get('registration_number', 'unregistered')} ({v.get('engine_capacity', 0)}cc)",
+            "finding": f"Owns {v.get('make_model') or 'Vehicle'} {v.get('registration_number') or 'unregistered'} ({v.get('engine_capacity', 0)}cc, reg. {v.get('registration_date') or 'date unknown'})",
             "source_file": "manual", "row_number": 0
         })
-    for idx, u in enumerate(req.utilities):
+    for idx, u in enumerate(utilities):
         evidence.append({
             "source": "DISCO", "record_id": f"MANUAL-U-{idx}", 
-            "finding": f"Connection {u.get('connection_id', 'unknown')} ({u.get('tariff_category', '')})",
+            "finding": f"Meter {u.get('meter_number') or 'unknown'}; connection {u.get('connection_id') or 'unknown'} from {u.get('connection_date') or 'date unknown'}; Average electricity bill Rs {u.get('monthly_bill', 0)}/month ({u.get('tariff_category') or ''})",
             "source_file": "manual", "row_number": 0
         })
-    for idx, pr in enumerate(req.properties):
+    for idx, pr in enumerate(properties):
         evidence.append({
             "source": "Registry", "record_id": f"MANUAL-P-{idx}", 
-            "finding": f"Property at {pr.get('address', '')} valued Rs {pr.get('assessed_value', 0)}",
+            "finding": f"Purchased {pr.get('area_marla') or ''}-marla {pr.get('property_type') or 'property'} at {pr.get('address', '')} valued Rs {pr.get('assessed_value', 0)} on {pr.get('transfer_date') or 'date unknown'}",
             "source_file": "manual", "row_number": 0
         })
 
-    avg_bill = 0
+    avg_bill = sum(u.get("monthly_bill", 0) for u in utilities) / max(len(utilities), 1) if utilities else 0
     vehicle_value = 0
-    property_value = sum(float(pr.get("assessed_value") or 0) for pr in req.properties)
+    property_value = sum(pr.get("assessed_value", 0) for pr in properties)
     lifestyle_income = round(
         (avg_bill * 12 / 0.06 if avg_bill else 0)
         + vehicle_value / 8
         + property_value / 20
     )
+    graph_nodes = [{"id": new_eid, "kind": "person", "label": req.name}]
+    graph_links = []
+    for idx, tax_return in enumerate(tax_returns):
+        asset_id = f"{new_eid}:tax_return:{idx}"
+        graph_nodes.append({"id": asset_id, "kind": "tax_return",
+                            "label": tax_return["return_reference"] or tax_return["tax_year"],
+                            "declared": tax_return["declared_income"],
+                            "paid": tax_return["tax_paid"]})
+        graph_links.append({"source": new_eid, "target": asset_id, "rel": "filed"})
+    for idx, v in enumerate(vehicles):
+        asset_id = f"{new_eid}:vehicle:{idx}"
+        graph_nodes.append({"id": asset_id, "kind": "vehicle",
+                            "label": v.get("make_model") or v.get("registration_number") or "Vehicle",
+                            "registration_number": v.get("registration_number"),
+                            "cc": v.get("engine_capacity", 0),
+                            "date": v.get("registration_date")})
+        graph_links.append({"source": new_eid, "target": asset_id, "rel": "owns"})
+    for idx, u in enumerate(utilities):
+        asset_id = f"{new_eid}:meter:{idx}"
+        graph_nodes.append({"id": asset_id, "kind": "meter",
+                            "label": u.get("connection_id") or "DISCO connection",
+                            "bill": u.get("monthly_bill", 0),
+                            "ctype": u.get("tariff_category", "")})
+        graph_links.append({"source": new_eid, "target": asset_id, "rel": "consumes_via"})
+    for idx, prop in enumerate(properties):
+        asset_id = f"{new_eid}:property:{idx}"
+        graph_nodes.append({"id": asset_id, "kind": "property",
+                            "label": prop.get("address") or "Property",
+                            "value": prop.get("assessed_value", 0),
+                            "ptype": prop.get("property_type"),
+                            "marla": prop.get("area_marla"),
+                            "date": prop.get("transfer_date")})
+        graph_links.append({"source": new_eid, "target": asset_id, "rel": "purchased_by"})
 
     profile = {
         "entity_id": new_eid,
@@ -897,27 +1009,31 @@ async def admin_add_person(
         "email": req.email,
         "ntn": req.ntn,
         "filer": req.filer_status,
-        "declared_income": req.declared_income,
+        "declared_income": declared_income,
+        "tax_paid": tax_paid,
+        "tax_returns": tax_returns,
         "lifestyle_income": lifestyle_income,
-        "household_id": new_eid,
+        "household_id": req.household_id or new_eid,
         "household_members": 1,
-        "household_declared": req.declared_income,
-        "n_vehicles": len(req.vehicles),
-        "n_properties": len(req.properties),
+        "household_declared": declared_income,
+        "household_manual_association": req.household_manual_association,
+        "n_vehicles": len(vehicles),
+        "n_properties": len(properties),
+        "n_utilities": len(utilities),
         "avg_bill": avg_bill,
-        "n_sources": 1 + int(bool(req.vehicles) or bool(req.utilities) or bool(req.properties)),
+        "n_sources": int(bool(tax_returns)) + int(bool(vehicles)) + int(bool(utilities)) + int(bool(properties)),
         "n_accounts": 0,
         "annual_deposits": 0,
         "n_intl_trips": 0,
         "travel_spend": 0,
         "source": "manual_entry",
-        "vehicles": req.vehicles,
-        "utilities": req.utilities,
-        "properties": req.properties,
+        "vehicles": vehicles,
+        "utilities": utilities,
+        "properties": properties,
         "evidence": evidence,
         "timeline": [],
         "match_provenance": [],
-        "graph": {"nodes": [{"id": new_eid, "kind": "person", "label": req.name}], "links": []},
+        "graph": {"nodes": graph_nodes, "links": graph_links},
         "audit": "This person was added manually and has not yet been scored by the pipeline.",
         "audit_urdu": None,
         "defensibility": "Manual entry pending validation and the next pipeline scoring run.",
