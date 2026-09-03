@@ -1385,49 +1385,44 @@ VIEWS['add-person'] = async (el, _param, my) => {
         <h2>Add Person</h2><span class="ur">شخص شامل کریں</span>
         <div class="desc">Manually provision a full entity record (and optionally a portal account) for a citizen not found in existing data.</div>
       </div>
-      <div class="card p-lg" style="max-width: 800px; margin: 0 auto;">
+      <div class="card card-pad" style="max-width: 800px; margin: 0 auto;">
         <form id="add-person-form">
-          <h3 style="margin-top:0;">Identity (Required)</h3>
-          <div style="display:flex; gap:16px; margin-bottom:12px;">
-            <label style="flex:1">Full Name * <input type="text" id="ap-name" required class="inp" style="width:100%"></label>
-            <label style="flex:1">Mobile Phone * <input type="text" id="ap-phone" placeholder="03XXXXXXXXX" pattern="^0[0-9]{10}$" required class="inp" style="width:100%"></label>
+          <div class="eyebrow"><span class="en">Identity · required</span><span class="ur">شناخت</span></div>
+          <div class="ctl-grid" style="margin-bottom:18px;">
+            <label class="note">Full Name *<input type="text" id="ap-name" required class="txt" style="margin-top:5px;"></label>
+            <label class="note">Mobile Phone *<input type="text" id="ap-phone" placeholder="03XXXXXXXXX" pattern="^0[0-9]{10}$" required class="txt" style="margin-top:5px;"></label>
           </div>
-          <div style="display:flex; gap:16px; margin-bottom:12px;">
-            <label style="flex:1">CNIC <input type="text" id="ap-cnic" placeholder="13 digits" pattern="^\\d{13}$" class="inp" style="width:100%"></label>
-            <label style="flex:1">Address * <input type="text" id="ap-address" required class="inp" style="width:100%"></label>
-          </div>
-          
-          <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
-          <h3 style="margin-top:0;">Additional Details (Optional)</h3>
-          <div style="display:flex; gap:16px; margin-bottom:12px;">
-            <label style="flex:1">Father/Husband Name <input type="text" id="ap-father" class="inp" style="width:100%"></label>
-            <label style="flex:1">Date of Birth <input type="date" id="ap-dob" class="inp" style="width:100%"></label>
+          <div class="ctl-grid" style="margin-bottom:18px;">
+            <label class="note">CNIC<input type="text" id="ap-cnic" placeholder="13 digits" pattern="^\\d{13}$" class="txt" style="margin-top:5px;"></label>
+            <label class="note">Address *<input type="text" id="ap-address" required class="txt" style="margin-top:5px;"></label>
           </div>
           
           <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
-          <h3 style="margin-top:0;">Tax Record (Optional)</h3>
-          <div style="display:flex; gap:16px; margin-bottom:12px;">
-            <label style="flex:1">Filer Status 
-              <select id="ap-filer" class="inp" style="width:100%">
-                <option value="Unknown">Unknown</option>
-                <option value="Filer">Filer</option>
-                <option value="Non-Filer">Non-Filer</option>
-              </select>
-            </label>
-            <label style="flex:1">Declared Income <input type="number" id="ap-income" value="0" class="inp" style="width:100%"></label>
+          <div class="eyebrow"><span class="en">Additional Details · optional</span><span class="ur">مزید تفصیل</span></div>
+          <div class="ctl-grid" style="margin-bottom:18px;">
+            <label class="note">Father/Husband Name<input type="text" id="ap-father" class="txt" style="margin-top:5px;"></label>
+            <label class="note">Date of Birth<input type="date" id="ap-dob" class="txt" style="margin-top:5px;"></label>
           </div>
           
           <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
-          <h3 style="margin-top:0;">Portal Access</h3>
-          <label style="display:flex; align-items:center; gap:8px;">
-            <input type="checkbox" id="ap-provision"> Provision Citizen Portal Account
+          <div class="eyebrow"><span class="en">Tax Record · optional</span><span class="ur">ٹیکس ریکارڈ</span></div>
+          <div class="ctl-grid" style="margin-bottom:18px;">
+            <label class="note">Filer Status<input list="ap-filer-options" id="ap-filer" value="Unknown" class="txt" style="margin-top:5px;"><datalist id="ap-filer-options"><option value="Unknown"><option value="Filer"><option value="Non-Filer"></datalist></label>
+            <label class="note">Declared Income<input type="number" id="ap-income" value="0" class="txt" style="margin-top:5px;"></label>
+          </div>
+          
+          <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
+          <div class="eyebrow"><span class="en">Portal Access</span><span class="ur">پورٹل رسائی</span></div>
+          <label class="switchrow">
+            <span><span class="st">Provision Citizen Portal Account</span><span class="sd">Create login credentials for this person</span></span>
+            <span class="switch"><input type="checkbox" id="ap-provision"><span class="track"></span></span>
           </label>
-          <div id="ap-pw-wrap" style="display:none; margin-top:12px;">
-            <label>Temporary Password * <input type="password" id="ap-password" minlength="8" class="inp" style="width:100%; max-width: 400px;"></label>
+          <div id="ap-pw-wrap" style="display:none; margin-top:12px; max-width:400px;">
+            <label class="note">Temporary Password *<input type="password" id="ap-password" minlength="8" class="txt" style="margin-top:5px;"></label>
           </div>
           
-          <div style="margin-top: 30px;">
-            <button type="submit" class="btn primary" id="ap-submit" style="padding: 10px 20px; font-size: 15px;">Search & Add Person</button>
+          <div style="margin-top:24px;">
+            <button type="submit" class="btn solid" id="ap-submit">Search & Add Person</button>
           </div>
         </form>
       </div>
@@ -1472,7 +1467,9 @@ VIEWS['add-person'] = async (el, _param, my) => {
       if (mr.ok) {
         const mj = await mr.json();
         if (mj.match) {
-          if (!confirm(\`Warning: This person likely already exists as Entity \${mj.entity_id}. Do you want to create a new entity anyway?\`)) {
+          const warning = 'Warning: This person likely already exists as Entity '
+            + mj.entity_id + '. Do you want to create a new entity anyway?';
+          if (!confirm(warning)) {
             btn.disabled = false;
             btn.textContent = 'Search & Add Person';
             return;
