@@ -42,6 +42,27 @@
 
 <main id="view" tabindex="-1"></main>
 
+<div id="admin-login-modal" class="modal" hidden>
+  <div class="modal-content">
+    <h2>Official Login</h2>
+    <p>Please log in with your official FBR credentials.</p>
+    <form id="admin-login-form">
+      <label>
+        Username
+        <input type="text" id="admin-username" required>
+      </label>
+      <label>
+        Password
+        <input type="password" id="admin-password" required>
+      </label>
+      <div id="admin-login-err" style="color:var(--err); margin-top:8px;"></div>
+      <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+        <button type="submit" class="btn">Log In</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <footer>
   <span><b>TaxNet Graph</b> · entity resolution → knowledge graph → GraphSAGE anomaly → decomposable scoring</span>
   <span id="foot"></span>

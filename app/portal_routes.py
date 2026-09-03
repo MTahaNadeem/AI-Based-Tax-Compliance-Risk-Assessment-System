@@ -230,6 +230,8 @@ class DisputeRequest(BaseModel):
             raise ValueError(f"category must be one of {allowed}")
         return v
 
+
+
     @field_validator("source", "record_id", "finding", "explanation")
     @classmethod
     def no_control_chars(cls, v):
@@ -237,6 +239,16 @@ class DisputeRequest(BaseModel):
             raise ValueError("Invalid characters")
         return v.strip()
 
+
+class LoginAdminRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=120)
+    password: str = Field(..., min_length=1, max_length=128)
+
+class AdminApproveRequest(BaseModel):
+    entity_id: str = Field(...)
+
+class AdminRejectRequest(BaseModel):
+    reason: str = Field(...)
 
 # ================================================================== Routes
 
@@ -305,7 +317,7 @@ async def register(req: RegisterRequest, request: Request, response: Response):
         # Provision account
         user_uuid = new_uuid()
         conn.execute(
-            "INSERT INTO users (uuid, entity_id, phone_hash, password_hash) VALUES (?,?,?,?)",
+            "INSERT INTO users (uuid, entity_id, phone, password_hash) VALUES (?,?,?,?)",
             (user_uuid, eid, phone_bcrypt, pw_hash)
         )
         conn.commit()
@@ -598,27 +610,41 @@ async def resolve_dispute(
             (row["entity_id"], row["source"], row["record_id"], p["sub"], dispute_id)
         )
     conn.commit()
-    _audit("auditor_dispute_action", actor_uuid=p["sub"], actor_role="auditor",
+    _audit("auditor_dispute_action", actor_uuid=p["sub"], actor_role=p.get("role"),
            entity_id=row["entity_id"],
            detail={"dispute_id": dispute_id, "action": action})
     return {"status": status}
 
 
-@router.patch("/admin/pending/{reg_id}", include_in_schema=False)
-async def resolve_pending_registration(
+@router.get("/admin/pending-registrations", include_in_schema=False)
+async def admin_pending_registrations(request: Request):
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    p = verify_token(token)
+    if not p or p.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+
+    conn = get_conn()
+    pending = [dict(r) for r in conn.execute(
+        "SELECT id, claimed_name, claimed_addr, candidates, reason, created_at, status "
+        "FROM pending_registrations WHERE status='pending' ORDER BY created_at DESC"
+    ).fetchall()]
+    return {"pending_registrations": pending}
+
+
+@router.post("/admin/pending-registrations/{reg_id}/approve", include_in_schema=False)
+async def admin_approve_pending(
     reg_id: int,
+    req: AdminApproveRequest,
     request: Request,
-    action: str,  # 'approve' | 'reject'
 ):
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         raise HTTPException(401, "Not authenticated")
     p = verify_token(token)
-    if not p or p.get("role") not in ("auditor", "admin"):
-        raise HTTPException(403, "Auditor access required")
-
-    if action not in ("approve", "reject"):
-        raise HTTPException(400, "action must be 'approve' or 'reject'")
+    if not p or p.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
 
     conn = get_conn()
     row = conn.execute(
@@ -628,32 +654,108 @@ async def resolve_pending_registration(
     if not row:
         raise HTTPException(404, "Pending registration not found")
 
-    if action == "approve":
-        candidates = json.loads(row["candidates"] or "[]")
-        if not candidates:
-            raise HTTPException(400, "No candidate entity_id to provision")
-        eid = candidates[0]["entity_id"]
-        existing = conn.execute(
-            "SELECT uuid FROM users WHERE entity_id=?", (eid,)
-        ).fetchone()
+    eid = req.entity_id
+    existing = conn.execute("SELECT uuid FROM users WHERE entity_id=?", (eid,)).fetchone()
+    
+    try:
         if not existing:
             user_uuid = new_uuid()
             conn.execute(
-                "INSERT INTO users (uuid, entity_id, phone_hash, password_hash) VALUES (?,?,?,?)",
+                "INSERT INTO users (uuid, entity_id, phone, password_hash) VALUES (?,?,?,?)",
                 (user_uuid, eid, row["phone_hash"], row["password_hash"])
             )
-        conn.execute(
-            "UPDATE pending_registrations SET status='approved' WHERE id=?", (reg_id,)
-        )
+        conn.execute("UPDATE pending_registrations SET status='approved' WHERE id=?", (reg_id,))
         conn.commit()
-        _audit("registration_approved", actor_uuid=p["sub"], actor_role="auditor",
-               entity_id=eid, detail={"reg_id": reg_id})
-    else:
-        conn.execute(
-            "UPDATE pending_registrations SET status='rejected' WHERE id=?", (reg_id,)
-        )
-        conn.commit()
-        _audit("registration_rejected", actor_uuid=p["sub"], actor_role="auditor",
-               detail={"reg_id": reg_id})
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(500, f"Database error: {str(e)}")
 
-    return {"status": "rejected" if action == "reject" else "approved"}
+    _audit("registration_approved", actor_uuid=p["sub"], actor_role="admin",
+           entity_id=eid, detail={"reg_id": reg_id})
+    return {"status": "approved"}
+
+
+@router.post("/admin/pending-registrations/{reg_id}/reject", include_in_schema=False)
+async def admin_reject_pending(
+    reg_id: int,
+    req: AdminRejectRequest,
+    request: Request,
+):
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    p = verify_token(token)
+    if not p or p.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM pending_registrations WHERE id=? AND status='pending'",
+        (reg_id,)
+    ).fetchone()
+    if not row:
+        raise HTTPException(404, "Pending registration not found")
+
+    conn.execute(
+        "UPDATE pending_registrations SET status='rejected' WHERE id=?", (reg_id,)
+    )
+    conn.commit()
+    _audit("registration_rejected", actor_uuid=p["sub"], actor_role="admin",
+           detail={"reg_id": reg_id, "reason": req.reason})
+
+    return {"status": "rejected"}
+
+
+# ================================================================== Admin Auth
+@router.post("/admin/login", include_in_schema=False)
+async def admin_login(req: LoginAdminRequest, request: Request, response: Response):
+    client_ip = request.client.host or "unknown"
+    ua = request.headers.get("user-agent", "")
+
+    ip_key = ip_hash(client_ip)
+    from .portal_auth import _RL_PEPPER, _pepper_hmac
+    user_hmac = _pepper_hmac(req.username).hex()[:24]
+    combined_key = ip_key[:12] + user_hmac[:12]
+
+    allowed, retry_after = _check_rate_limit(combined_key, "admin_login")
+    if not allowed:
+        _audit("admin_login_fail", ip=client_ip, ua=ua, detail={"rate_limited": True})
+        raise HTTPException(
+            429, "Too many login attempts. Please try again later.",
+            headers={"Retry-After": retry_after or "1800"}
+        )
+
+    conn = get_conn()
+    admin = conn.execute("SELECT uuid, role, password_hash, is_active FROM admins WHERE username=?", (req.username,)).fetchone()
+    
+    if not admin:
+        _audit("admin_login_fail", ip=client_ip, ua=ua, detail={"username": req.username})
+        raise HTTPException(401, "Invalid username or password")
+        
+    if not admin["is_active"]:
+        raise HTTPException(403, "Account disabled")
+
+    import bcrypt as _bcrypt
+    if not _bcrypt.checkpw(req.password.encode(), admin["password_hash"].encode()):
+        _audit("admin_login_fail", actor_uuid=admin["uuid"], actor_role=admin["role"], ip=client_ip, ua=ua)
+        raise HTTPException(401, "Invalid username or password")
+
+    # Success
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute("UPDATE admins SET last_login_at=? WHERE uuid=?", (now, admin["uuid"]))
+    conn.commit()
+
+    token = issue_token(admin["uuid"], role=admin["role"])
+    response.set_cookie(
+        key=COOKIE_NAME, value=token, httponly=True, samesite="strict",
+        max_age=1800, secure=False  # Secure=False for local dev
+    )
+    _audit("admin_login", actor_uuid=admin["uuid"], actor_role=admin["role"], ip=client_ip, ua=ua)
+    return {"status": "success", "role": admin["role"]}
+
+
+@router.post("/admin/logout", include_in_schema=False)
+async def admin_logout(response: Response):
+    response.delete_cookie(COOKIE_NAME, path="/", httponly=True, samesite="strict")
+    return {"status": "logged_out"}
+

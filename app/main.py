@@ -36,6 +36,22 @@ async def lifespan(application: FastAPI):
 
 app = FastAPI(title="TaxNet Graph API", version="2.0", lifespan=lifespan)
 
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from .portal_auth import verify_token
+from .portal_routes import COOKIE_NAME
+
+@app.middleware("http")
+async def require_admin_auditor(request: Request, call_next):
+    if request.url.path.startswith("/api/"):
+        token = request.cookies.get(COOKIE_NAME)
+        if not token:
+            return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+        p = verify_token(token)
+        if not p or p.get("role") not in ("auditor", "admin"):
+            return JSONResponse(status_code=403, content={"detail": "Admin/Auditor access required"})
+    return await call_next(request)
+
 def load():
     if not os.path.exists(DATA_PATH):
         raise HTTPException(503, "Pipeline output missing — run pipeline/run_pipeline.py first")

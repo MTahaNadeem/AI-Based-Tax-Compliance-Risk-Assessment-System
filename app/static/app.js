@@ -121,6 +121,10 @@ const API = (() => {
     if (cache.has(path)) return cache.get(path);
     const pr = (async () => {
       const r = await fetch(path);
+      if (r.status === 401 || r.status === 403) {
+        document.getElementById('admin-login-modal').hidden = false;
+        throw new Error('Authentication required');
+      }
       if (!r.ok) {
         let detail = r.statusText;
         try { detail = (await r.json()).detail || detail; } catch {}
@@ -1264,6 +1268,7 @@ VIEWS.disputes = async (el, _param, my) => {
       <div class="note" style="margin-bottom:12px">
         Identity claims that matched ambiguously during registration.
         Approve to provision a portal account; reject to decline.
+        <br><i>Requires Administrator role.</i>
       </div>
       ${pending.length === 0 ? '<div class="note">No pending registrations.</div>' :
         `<table class="ev-tbl" style="width:100%">
@@ -1279,7 +1284,7 @@ VIEWS.disputes = async (el, _param, my) => {
               <td style="font-size:12px">${esc((p.created_at||'').slice(0,10))}</td>
               <td>
                 <button class="btn" style="font-size:11.5px;padding:4px 10px;margin-right:4px"
-                  onclick="resolveReg(${p.id},'approve',this)">Approve</button>
+                  onclick="resolveReg(${p.id},'approve',this, '${esc(JSON.stringify(cands))}')">Approve</button>
                 <button class="btn danger" style="font-size:11.5px;padding:4px 10px"
                   onclick="resolveReg(${p.id},'reject',this)">Reject</button>
               </td>
@@ -1335,17 +1340,71 @@ async function resolveDisp(id, action, btn) {
   }
 }
 
-async function resolveReg(id, action, btn) {
+async function resolveReg(id, action, btn, candsJsonStr) {
+  let body = {};
+  if (action === 'approve') {
+    const cands = JSON.parse(candsJsonStr || '[]');
+    if (!cands.length) return toast('No candidates to approve.', 'err');
+    
+    // For demo simplicity, prompt the user for the entity_id
+    const candStr = cands.map(c => c.entity_id).join(', ');
+    const eid = prompt(`Enter entity_id to approve this registration against (Candidates: ${candStr}):`, cands[0].entity_id);
+    if (!eid) return;
+    body = { entity_id: eid };
+  } else {
+    const reason = prompt('Enter rejection reason (e.g. No matching candidate, Insufficient confidence, Suspected fraudulent claim):');
+    if (!reason) return;
+    body = { reason: reason };
+  }
+
   btn.disabled = true; btn.textContent = '…';
   try {
-    await fetch(`/portal/admin/pending/${id}?action=${encodeURIComponent(action)}`, {
-      method: 'PATCH', credentials: 'same-origin'
+    const r = await fetch(`/portal/admin/pending-registrations/${id}/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
     });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || r.statusText);
+
     toast(`Registration #${id} ${action}d.`);
     VIEWS.disputes(document.getElementById('view'), null, NAV_SEQ);
   } catch(e) {
     btn.disabled = false; btn.textContent = action;
     toast('Action failed: ' + e.message, 'err');
+    if (e.message.includes('403')) {
+      toast('Admin role required for this action.', 'err');
+    }
   }
 }
+
+// Global Admin Login UI Handlers
+document.addEventListener('DOMContentLoaded', () => {
+  const loginForm = document.getElementById('admin-login-form');
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const u = document.getElementById('admin-username').value;
+      const p = document.getElementById('admin-password').value;
+      const errEl = document.getElementById('admin-login-err');
+      errEl.textContent = 'Logging in...';
+      
+      try {
+        const r = await fetch('/portal/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: u, password: p })
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || 'Login failed');
+        
+        document.getElementById('admin-login-modal').hidden = true;
+        toast(`Logged in as ${j.role}`);
+        location.reload();
+      } catch(err) {
+        errEl.textContent = err.message;
+      }
+    });
+  }
+});
 
