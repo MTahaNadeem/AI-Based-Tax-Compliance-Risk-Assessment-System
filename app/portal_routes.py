@@ -656,14 +656,17 @@ async def admin_approve_pending(
 
     eid = req.entity_id
     existing = conn.execute("SELECT uuid FROM users WHERE entity_id=?", (eid,)).fetchone()
-    
+    if existing:
+        raise HTTPException(
+            409, "This entity already has an active account — approving would overwrite/duplicate access. Reject or manually merge instead."
+        )
+
     try:
-        if not existing:
-            user_uuid = new_uuid()
-            conn.execute(
-                "INSERT INTO users (uuid, entity_id, phone, password_hash) VALUES (?,?,?,?)",
-                (user_uuid, eid, row["phone_hash"], row["password_hash"])
-            )
+        user_uuid = new_uuid()
+        conn.execute(
+            "INSERT INTO users (uuid, entity_id, phone, password_hash) VALUES (?,?,?,?)",
+            (user_uuid, eid, row["phone_hash"], row["password_hash"])
+        )
         conn.execute("UPDATE pending_registrations SET status='approved' WHERE id=?", (reg_id,))
         conn.commit()
     except Exception as e:
