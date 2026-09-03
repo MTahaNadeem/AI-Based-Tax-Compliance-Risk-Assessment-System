@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Console | Official Login</title>
+<meta name="description" content="TaxNet Official Portal — Audit Console login for authorized personnel.">
+<link rel="stylesheet" href="/static/styles.css">
+<link rel="stylesheet" href="/static/portal.css">
+</head>
+<body class="portal-body">
+
+<div class="ribbon">FEDERAL BOARD OF REVENUE · <b>OFFICIAL PORTAL</b> · TAXNET GRAPH · SYNTHETIC DEMONSTRATION DATA</div>
+
+<header class="p-mast">
+  <div class="p-mast-in">
+    <div class="seal-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M14.6 3.2a9 9 0 1 0 5.2 11.9A8 8 0 0 1 14.6 3.2Z" fill="#D9B96A"/>
+        <path d="M16.9 8.2l.9 2.1 2.3.2-1.7 1.5.5 2.2-2-1.2-2 1.2.5-2.2-1.7-1.5 2.3-.2.9-2.1Z" fill="#D9B96A"/>
+      </svg>
+    </div>
+    <div class="p-brand">
+      <h1>AUDIT CONSOLE</h1>
+      <div class="p-brand-sub">FBR · Official & Auditor Access</div>
+    </div>
+    <div class="p-mast-right" id="p-mast-right">
+      <a href="/portal" class="p-back-link">← Citizen Portal</a>
+    </div>
+  </div>
+</header>
+
+<main id="p-view" tabindex="-1" role="main">
+  <div class="p-auth-wrap">
+    <div class="p-card" id="auth-card">
+      <div class="p-security-banner">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+          <path d="M10 2L3 5.5V10c0 4.4 3 7.6 7 8.9 4-1.3 7-4.5 7-8.9V5.5L10 2z" stroke="#a07a0a" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M7 10l2 2 4-4" stroke="#a07a0a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>This is a restricted system for authorized FBR officials and auditors only. All access is logged and monitored.</span>
+      </div>
+
+      <p class="p-card-sub" style="margin-top: 24px;">Please sign in with your official credentials.</p>
+      
+      <form id="admin-login-form">
+        <div class="p-field">
+          <label class="p-label" for="admin-username">Username</label>
+          <input class="p-input" id="admin-username" type="text" placeholder="e.g. auditor_01" required>
+        </div>
+        <div class="p-field">
+          <label class="p-label" for="admin-password">Password</label>
+          <input class="p-input" id="admin-password" type="password" placeholder="••••••••" required>
+        </div>
+        
+        <div class="p-err-msg" id="admin-login-err" style="margin-bottom:10px"></div>
+        <button class="p-btn" type="submit" id="login-btn">Sign In</button>
+      </form>
+    </div>
+  </div>
+</main>
+
+<footer class="p-footer">
+  <span><b>TaxNet Graph</b> · Federal Board of Revenue</span>
+  <span>This is a restricted system for authorized FBR officials and auditors only. All access is logged and monitored.</span>
+</footer>
+
+<script>
+document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const u = document.getElementById('admin-username');
+  const p = document.getElementById('admin-password');
+  const errEl = document.getElementById('admin-login-err');
+  const btn = document.getElementById('login-btn');
+  
+  errEl.textContent = '';
+  errEl.classList.remove('show');
+  u.classList.remove('err');
+  p.classList.remove('err');
+
+  btn.disabled = true;
+  btn.textContent = 'Signing In...';
+  
+  try {
+    const r = await fetch('/portal/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u.value, password: p.value })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || 'Login failed');
+    
+    // Redirect to dashboard on success
+    window.location.href = '/';
+  } catch(err) {
+    errEl.textContent = err.message === 'Login failed' ? 'Invalid username or password.' : err.message;
+    errEl.classList.add('show');
+    u.classList.add('err');
+    p.classList.add('err');
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  }
+});
+</script>
+</body>
+</html>

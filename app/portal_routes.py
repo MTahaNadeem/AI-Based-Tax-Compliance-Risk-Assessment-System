@@ -754,6 +754,22 @@ async def admin_login(req: LoginAdminRequest, request: Request, response: Respon
     return {"status": "success", "role": admin["role"]}
 
 
+@router.get("/admin/me", include_in_schema=False)
+async def admin_me(request: Request):
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    p = verify_token(token)
+    if not p or p.get("role") not in ("auditor", "admin"):
+        raise HTTPException(403, "Admin/Auditor access required")
+    # Fetch username from DB using sub (uuid)
+    conn = get_conn()
+    row = conn.execute("SELECT username FROM admins WHERE uuid=?", (p["sub"],)).fetchone()
+    if not row:
+        raise HTTPException(404, "User not found")
+    return {"username": row["username"], "role": p["role"]}
+
+
 @router.post("/admin/logout", include_in_schema=False)
 async def admin_logout(response: Response):
     response.delete_cookie(COOKIE_NAME, path="/", httponly=True, samesite="strict")

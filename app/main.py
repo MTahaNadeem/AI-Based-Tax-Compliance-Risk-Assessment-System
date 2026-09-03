@@ -13,7 +13,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -211,8 +211,18 @@ def sources():
                 er_stats=d["er_stats"], er_metrics=d["er_metrics"])
 
 @app.get("/")
-def index():
+def index(request: Request):
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        return RedirectResponse(url="/login")
+    p = verify_token(token)
+    if not p or p.get("role") not in ("auditor", "admin"):
+        return RedirectResponse(url="/login")
     return FileResponse(os.path.join(HERE, "static", "index.html"))
+
+@app.get("/login")
+def login_page():
+    return FileResponse(os.path.join(HERE, "static", "admin-login.html"))
 
 
 @app.get("/portal", include_in_schema=False)

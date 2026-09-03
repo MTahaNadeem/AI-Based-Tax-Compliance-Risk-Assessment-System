@@ -122,7 +122,7 @@ const API = (() => {
     const pr = (async () => {
       const r = await fetch(path);
       if (r.status === 401 || r.status === 403) {
-        document.getElementById('admin-login-modal').hidden = false;
+        window.location.href = '/login';
         throw new Error('Authentication required');
       }
       if (!r.ok) {
@@ -1378,32 +1378,31 @@ async function resolveReg(id, action, btn, candsJsonStr) {
   }
 }
 
-// Global Admin Login UI Handlers
-document.addEventListener('DOMContentLoaded', () => {
-  const loginForm = document.getElementById('admin-login-form');
-  if (loginForm) {
-    loginForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const u = document.getElementById('admin-username').value;
-      const p = document.getElementById('admin-password').value;
-      const errEl = document.getElementById('admin-login-err');
-      errEl.textContent = 'Logging in...';
-      
-      try {
-        const r = await fetch('/portal/admin/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: u, password: p })
-        });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.detail || 'Login failed');
-        
-        document.getElementById('admin-login-modal').hidden = true;
-        toast(`Logged in as ${j.role}`);
-        location.reload();
-      } catch(err) {
-        errEl.textContent = err.message;
+// Fetch and display logged-in official user info
+document.addEventListener('DOMContentLoaded', async () => {
+  const userInfoEl = document.getElementById('official-user-info');
+  const logoutBtn = document.getElementById('official-logout-btn');
+  
+  if (userInfoEl && logoutBtn) {
+    try {
+      const r = await fetch('/portal/admin/me');
+      if (r.ok) {
+        const data = await r.json();
+        userInfoEl.textContent = `${data.username} (${data.role})`;
+      } else {
+        window.location.href = '/login';
       }
+    } catch (e) {
+      // Ignore
+    }
+
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await fetch('/portal/admin/logout', { method: 'POST' });
+      } catch (e) {
+        // Ignore
+      }
+      window.location.href = '/login';
     });
   }
 });
