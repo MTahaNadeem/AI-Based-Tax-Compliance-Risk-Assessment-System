@@ -425,7 +425,7 @@ VIEWS.dashboard = async (el, _param, my) => {
     <div class="toolrow">
       <input class="search" id="dq" type="search" placeholder="Search name or entity ID…" value="${esc(dashState.q)}" aria-label="Search entities">
       <span class="note" id="dcount"></span>
-      <span class="spacer" style="margin-left:auto"></span>
+      <span class="spacer" style="margin-inline-start:auto"></span>
       <a class="btn sm" id="dcsv" href="/api/export/csv">⬇ CSV — current tier</a>
     </div>
     <div class="tablewrap">
@@ -679,7 +679,7 @@ function renderDossier(box, p) {
       <button class="btn sm ${ws.frozen ? 'danger' : ''}" id="fbtn">${ws.frozen ? '✕ Withdraw freeze flag' : '❄ Flag asset freeze'}</button>
       <span class="sep"></span>
       <button class="btn sm" onclick="window.print()">⎙ Print case file</button>
-      <span class="note local" style="margin-left:auto">actions saved to this terminal's workspace</span>
+      <span class="note local" style="margin-inline-start:auto">actions saved to this terminal's workspace</span>
     </div>
 
     <section class="blk">
@@ -1285,7 +1285,7 @@ VIEWS.disputes = async (el, _param, my) => {
               <td style="font-size:12px;font-family:var(--mono)">${cands.map(c=>`${c.entity_id} (${c.score})`).join('<br>')}</td>
               <td style="font-size:12px">${esc((p.created_at||'').slice(0,10))}</td>
               <td>
-                <button class="btn" style="font-size:11.5px;padding:4px 10px;margin-right:4px"
+                <button class="btn" style="font-size:11.5px;padding:4px 10px;margin-inline-end:4px"
                   onclick="resolveReg(${p.id},'approve',this, '${esc(JSON.stringify(cands))}')">Approve</button>
                 <button class="btn danger" style="font-size:11.5px;padding:4px 10px"
                   onclick="resolveReg(${p.id},'reject',this)">Reject</button>
@@ -1384,71 +1384,71 @@ VIEWS['add-person'] = async (el, _param, my) => {
   el.innerHTML = `
     <div class="wrap view-enter">
       <div class="pagehead">
-        <h2>Add Person</h2><span class="ur">شخص شامل کریں</span>
-        <div class="desc">Manually provision a full entity record (and optionally a portal account) for a citizen not found in existing data.</div>
+        <h2>${t('Add Person')}</h2>
+        <div class="desc">${t('Manually provision a full entity record (and optionally a portal account) for a citizen not found in existing data.')}</div>
       </div>
       <div class="card card-pad" style="max-width: 800px; margin: 0 auto;">
         <form id="add-person-form">
-          <div class="eyebrow"><span class="en">Identity · required</span><span class="ur">شناخت</span></div>
+          <div class="eyebrow"><span class="en">${t('Identity · required')}</span></div>
           <div class="ctl-grid" style="margin-bottom:18px;">
-            <label class="note">Full Name *<input type="text" id="ap-name" required class="txt" style="margin-top:5px;"></label>
-            <label class="note">Mobile Phone *<input type="text" id="ap-phone" placeholder="03XXXXXXXXX" pattern="^0[0-9]{10}$" required class="txt" style="margin-top:5px;"></label>
+            <label class="note">${t('Full Name *')}<input type="text" id="ap-name" required class="txt" style="margin-top:5px;"></label>
+            <label class="note">${t('Mobile Phone *')}<input type="text" id="ap-phone" placeholder="03XXXXXXXXX" pattern="^0[0-9]{10}$" required class="txt" style="margin-top:5px;"></label>
           </div>
           <div class="ctl-grid" style="margin-bottom:18px;">
-            <label class="note">CNIC<input type="text" id="ap-cnic" placeholder="13 digits" pattern="^\\d{13}$" class="txt" style="margin-top:5px;"></label>
-            <label class="note">NTN<input type="text" id="ap-ntn" class="txt" style="margin-top:5px;"></label>
-            <label class="note">Address *<input type="text" id="ap-address" required class="txt" style="margin-top:5px;"></label>
-          </div>
-          
-          <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
-          <div class="eyebrow"><span class="en">Additional Details · optional</span><span class="ur">مزید تفصیل</span></div>
-          <div class="ctl-grid" style="margin-bottom:18px;">
-            <label class="note">Father/Husband Name<input type="text" id="ap-father" value="" autocomplete="off" class="txt" style="margin-top:5px;"></label>
-            <label class="note">Date of Birth<input type="date" id="ap-dob" class="txt" style="margin-top:5px;"></label>
+            <label class="note">${t('CNIC')}<input type="text" id="ap-cnic" placeholder="13 digits" pattern="^\\d{13}$" class="txt" style="margin-top:5px;"></label>
+            <label class="note">${t('NTN')}<input type="text" id="ap-ntn" class="txt" style="margin-top:5px;"></label>
+            <label class="note">${t('Address *')}<input type="text" id="ap-address" required class="txt" style="margin-top:5px;"></label>
           </div>
           
           <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
-          <div class="eyebrow"><span class="en">Tax Record · optional</span><span class="ur">ٹیکس ریکارڈ</span></div>
-          <label class="note">Filer Status<select id="ap-filer" class="txt" style="font-family:var(--mono);font-size:12px;padding:9px 12px;width:100%;border:1.5px solid var(--line);background:var(--card);color:var(--ink);margin-top:5px;"><option value="Unknown">Unknown</option><option value="Filer">Filer</option><option value="Non-Filer">Non-Filer</option></select></label>
+          <div class="eyebrow"><span class="en">${t('Additional Details · optional')}</span></div>
+          <div class="ctl-grid" style="margin-bottom:18px;">
+            <label class="note">${t('Father/Husband Name')}<input type="text" id="ap-father" value="" autocomplete="off" class="txt" style="margin-top:5px;"></label>
+            <label class="note">${t('Date of Birth')}<input type="date" id="ap-dob" class="txt" style="margin-top:5px;"></label>
+          </div>
+          
+          <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
+          <div class="eyebrow"><span class="en">${t('Tax Record · optional')}</span></div>
+          <label class="note">${t('Filer Status')}<select id="ap-filer" class="txt" style="font-family:var(--mono);font-size:12px;padding:9px 12px;width:100%;border:1.5px solid var(--line);background:var(--card);color:var(--ink);margin-top:5px;"><option value="Unknown">${t('Unknown')}</option><option value="Filer">${t('Filer')}</option><option value="Non-Filer">${t('Non-Filer')}</option></select></label>
           <div id="ap-tax-returns"></div>
-          <button type="button" class="btn sm" id="ap-add-tax-return">+ Add another tax return</button>
+          <button type="button" class="btn sm" id="ap-add-tax-return">${t('+ Add another tax return')}</button>
 
           <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
-          <div class="eyebrow"><span class="en">Vehicle / Excise · optional</span><span class="ur">گاڑیوں کا ریکارڈ</span></div>
+          <div class="eyebrow"><span class="en">${t('Vehicle / Excise · optional')}</span></div>
           <div id="ap-vehicles"></div>
-          <button type="button" class="btn sm" id="ap-add-vehicle">+ Add another vehicle</button>
+          <button type="button" class="btn sm" id="ap-add-vehicle">${t('+ Add another vehicle')}</button>
 
           <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
-          <div class="eyebrow"><span class="en">Utilities / DISCO · optional</span><span class="ur">بجلی کا ریکارڈ</span></div>
+          <div class="eyebrow"><span class="en">${t('Utilities / DISCO · optional')}</span></div>
           <div id="ap-utilities"></div>
-          <button type="button" class="btn sm" id="ap-add-utility">+ Add another connection</button>
+          <button type="button" class="btn sm" id="ap-add-utility">${t('+ Add another connection')}</button>
 
           <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
-          <div class="eyebrow"><span class="en">Property · optional</span><span class="ur">جائیداد کا ریکارڈ</span></div>
+          <div class="eyebrow"><span class="en">${t('Property · optional')}</span></div>
           <div id="ap-properties"></div>
-          <button type="button" class="btn sm" id="ap-add-property">+ Add another property</button>
+          <button type="button" class="btn sm" id="ap-add-property">${t('+ Add another property')}</button>
 
           <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
-          <div class="eyebrow"><span class="en">Household Link · optional</span><span class="ur">خاندانی ربط</span></div>
+          <div class="eyebrow"><span class="en">${t('Household Link · optional')}</span></div>
           <div class="ctl-grid">
-            <label class="note">Search household ID, member name, or address<input type="search" id="ap-household-query" class="txt" autocomplete="off" style="margin-top:5px;"></label>
-            <div><button type="button" class="btn sm" id="ap-household-search" style="margin-top:18px;">Search households</button></div>
+            <label class="note">${t('Search household ID, member name, or address')}<input type="search" id="ap-household-query" class="txt" autocomplete="off" style="margin-top:5px;"></label>
+            <div><button type="button" class="btn sm" id="ap-household-search" style="margin-top:18px;">${t('Search households')}</button></div>
           </div>
           <div id="ap-household-results" class="note" style="margin-top:10px;"></div>
           <div id="ap-household-selected" class="note" style="margin-top:8px;"></div>
           
           <hr style="margin:24px 0; border:0; border-top:1px solid var(--bord);">
-          <div class="eyebrow"><span class="en">Portal Access</span><span class="ur">پورٹل رسائی</span></div>
+          <div class="eyebrow"><span class="en">${t('Portal Access')}</span></div>
           <label class="switchrow">
-            <span><span class="st">Provision Citizen Portal Account</span><span class="sd">Create login credentials for this person</span></span>
+            <span><span class="st">${t('Provision Citizen Portal Account')}</span><span class="sd">${t('Create login credentials for this person')}</span></span>
             <span class="switch"><input type="checkbox" id="ap-provision"><span class="track"></span></span>
           </label>
           <div id="ap-pw-wrap" style="display:none; margin-top:12px; max-width:400px;">
-            <label class="note">Temporary Password *<input type="password" id="ap-password" minlength="8" class="txt" style="margin-top:5px;"></label>
+            <label class="note">${t('Temporary Password *')}<input type="password" id="ap-password" minlength="8" class="txt" style="margin-top:5px;"></label>
           </div>
           
           <div style="margin-top:24px;">
-            <button type="submit" class="btn solid" id="ap-submit">Search & Add Person</button>
+            <button type="submit" class="btn solid" id="ap-submit">${t('Search & Add Person')}</button>
           </div>
         </form>
       </div>
@@ -1474,38 +1474,38 @@ VIEWS['add-person'] = async (el, _param, my) => {
     row.querySelector('[data-remove]').addEventListener('click', () => row.remove());
   };
   const taxReturnTemplate = index => `
-    <div class="eyebrow"><span class="en">Tax Return ${index + 1}</span><button type="button" class="btn sm danger" data-remove>Remove</button></div>
+    <div class="eyebrow"><span class="en">${t('Tax Return')} ${index + 1}</span><button type="button" class="btn sm danger" data-remove>${t('Remove')}</button></div>
     <div class="ctl-grid">
-      <label class="note">Tax Year<input type="text" data-field="tax_year" placeholder="2024" class="txt" style="margin-top:5px;"></label>
-      <label class="note">Return Reference<input type="text" data-field="return_reference" class="txt" style="margin-top:5px;"></label>
-      <label class="note">Declared Income (PKR)<input type="number" min="0" data-field="declared_income" class="txt" style="margin-top:5px;"></label>
-      <label class="note">Tax Paid (PKR)<input type="number" min="0" data-field="tax_paid" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Tax Year')}<input type="text" data-field="tax_year" placeholder="2024" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Return Reference')}<input type="text" data-field="return_reference" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Declared Income (PKR)')}<input type="number" min="0" data-field="declared_income" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Tax Paid (PKR)')}<input type="number" min="0" data-field="tax_paid" class="txt" style="margin-top:5px;"></label>
     </div>`;
   const vehicleTemplate = index => `
-    <div class="eyebrow"><span class="en">Vehicle ${index + 1}</span><button type="button" class="btn sm danger" data-remove>Remove</button></div>
+    <div class="eyebrow"><span class="en">${t('Vehicle')} ${index + 1}</span><button type="button" class="btn sm danger" data-remove>${t('Remove')}</button></div>
     <div class="ctl-grid">
-      <label class="note">Registration Number<input type="text" data-field="registration_number" class="txt" style="margin-top:5px;"></label>
-      <label class="note">Engine Capacity (cc)<input type="number" min="0" data-field="engine_capacity" class="txt" style="margin-top:5px;"></label>
-      <label class="note">Make / Model<input type="text" data-field="make_model" class="txt" style="margin-top:5px;"></label>
-      <label class="note">Registration Date<input type="date" data-field="registration_date" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Registration Number')}<input type="text" data-field="registration_number" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Engine Capacity (cc)')}<input type="number" min="0" data-field="engine_capacity" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Make / Model')}<input type="text" data-field="make_model" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Registration Date')}<input type="date" data-field="registration_date" class="txt" style="margin-top:5px;"></label>
     </div>`;
   const utilityTemplate = index => `
-    <div class="eyebrow"><span class="en">Connection ${index + 1}</span><button type="button" class="btn sm danger" data-remove>Remove</button></div>
+    <div class="eyebrow"><span class="en">${t('Connection')} ${index + 1}</span><button type="button" class="btn sm danger" data-remove>${t('Remove')}</button></div>
     <div class="ctl-grid">
-      <label class="note">Connection ID<input type="text" data-field="connection_id" class="txt" style="margin-top:5px;"></label>
-      <label class="note">Meter Number<input type="text" data-field="meter_number" class="txt" style="margin-top:5px;"></label>
-      <label class="note">Tariff Category<input type="text" data-field="tariff_category" class="txt" style="margin-top:5px;"></label>
-      <label class="note">Monthly Bill (PKR)<input type="number" min="0" data-field="monthly_bill" class="txt" style="margin-top:5px;"></label>
-      <label class="note">Connection Date<input type="date" data-field="connection_date" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Connection ID')}<input type="text" data-field="connection_id" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Meter Number')}<input type="text" data-field="meter_number" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Tariff Category')}<input type="text" data-field="tariff_category" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Monthly Bill (PKR)')}<input type="number" min="0" data-field="monthly_bill" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Connection Date')}<input type="date" data-field="connection_date" class="txt" style="margin-top:5px;"></label>
     </div>`;
   const propertyTemplate = index => `
-    <div class="eyebrow"><span class="en">Property ${index + 1}</span><button type="button" class="btn sm danger" data-remove>Remove</button></div>
+    <div class="eyebrow"><span class="en">${t('Property')} ${index + 1}</span><button type="button" class="btn sm danger" data-remove>${t('Remove')}</button></div>
     <div class="ctl-grid">
-      <label class="note">Location / Address<input type="text" data-field="address" class="txt" style="margin-top:5px;"></label>
-      <label class="note">Assessed Value (PKR)<input type="number" min="0" data-field="assessed_value" class="txt" style="margin-top:5px;"></label>
-      <label class="note">Property Type<input type="text" data-field="property_type" class="txt" style="margin-top:5px;"></label>
-      <label class="note">Area (marla)<input type="number" min="0" step="0.01" data-field="area_marla" class="txt" style="margin-top:5px;"></label>
-      <label class="note">Acquisition Date<input type="date" data-field="transfer_date" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Location / Address')}<input type="text" data-field="address" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Assessed Value (PKR)')}<input type="number" min="0" data-field="assessed_value" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Property Type')}<input type="text" data-field="property_type" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Area (marla)')}<input type="number" min="0" step="0.01" data-field="area_marla" class="txt" style="margin-top:5px;"></label>
+      <label class="note">${t('Acquisition Date')}<input type="date" data-field="transfer_date" class="txt" style="margin-top:5px;"></label>
     </div>`;
   document.getElementById('ap-add-vehicle').addEventListener('click', () => addRepeatable('ap-vehicles', vehicleTemplate));
   document.getElementById('ap-add-utility').addEventListener('click', () => addRepeatable('ap-utilities', utilityTemplate));

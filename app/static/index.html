@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TaxNet Graph — National Tax Intelligence</title>
 <meta name="description" content="TaxNet Graph — entity resolution, knowledge graph and GraphSAGE anomaly detection over national tax records.">
-<link rel="stylesheet" href="/static/styles.css?v=4">
+<link rel="stylesheet" href="/static/styles.css?v=5">
 <script src="/static/vendor/d3.min.js"></script>
+<script src="/static/i18n.js"></script>
 </head>
 <body>
 
@@ -21,27 +22,30 @@
       </svg>
     </div>
     <div class="brand">
-      <h1>TaxNet Graph</h1>
-      <div class="ur">قومی ٹیکس نیٹ — گراف انٹیلی جنس</div>
+      <h1 data-i18n="TaxNet Graph">TaxNet Graph</h1>
     </div>
     <div class="mast-right">
       <div class="live"><i></i>Pipeline data linked</div>
       <div class="runinfo" id="runinfo">loading run info…</div>
       <div class="clock"><span id="clock">--:--:--</span><small>PKT · Islamabad</small></div>
-      <div class="user-info" style="margin-left: 16px; border-left: 1px solid var(--bord); padding-left: 16px; display: flex; align-items: center;">
-        <span id="official-user-info" class="en" style="font-size: 13px; font-weight: 500;"></span>
-        <button id="official-logout-btn" class="btn" style="margin-left:8px; padding:3px 10px; font-size:12px;">Log out</button>
+      <div class="user-info" style="margin-inline-start: 16px; border-inline-start: 1px solid var(--bord); padding-inline-start: 16px; display: flex; align-items: center;">
+        <select id="lang-switcher" class="btn" style="margin-inline-end: 16px; font-size: 12px; padding: 2px 6px; background: var(--bg); color: var(--fg); border-color: var(--bord);">
+          <option value="en">EN</option>
+          <option value="ur">اردو</option>
+        </select>
+        <span id="official-user-info" class="en" style="font-size: 13px; font-weight: 500;" data-i18n="Administrator"></span>
+        <button id="official-logout-btn" class="btn" style="margin-inline-start:8px; padding:3px 10px; font-size:12px;" data-i18n="Log out">Log out</button>
       </div>
     </div>
   </div>
   <nav class="nav" id="nav" aria-label="Primary">
-    <a class="navtab" href="#/" data-route="home">Home</a>
-    <a class="navtab" href="#/dashboard" data-route="dashboard">Dashboard</a>
-    <a class="navtab" href="#/register" data-route="register">Risk Register</a>
-    <a class="navtab" href="#/integrations" data-route="integrations">Integrations <span class="nn" id="nav-rq" hidden></span></a>
-    <a class="navtab" href="#/disputes" data-route="disputes">Citizen Disputes</a>
-    <a class="navtab" href="#/control" data-route="control">Control Panel</a>
-    <a class="navtab" href="#/add-person" data-route="add-person">Add Person</a>
+    <a class="navtab" href="#/" data-route="home" data-i18n="Home">Home</a>
+    <a class="navtab" href="#/dashboard" data-route="dashboard" data-i18n="Dashboard">Dashboard</a>
+    <a class="navtab" href="#/register" data-route="register" data-i18n="Risk Register">Risk Register</a>
+    <a class="navtab" href="#/integrations" data-route="integrations" data-i18n="Integrations">Integrations <span class="nn" id="nav-rq" hidden></span></a>
+    <a class="navtab" href="#/disputes" data-route="disputes" data-i18n="Citizen Disputes">Citizen Disputes</a>
+    <a class="navtab" href="#/control" data-route="control" data-i18n="Control Panel">Control Panel</a>
+    <a class="navtab" href="#/add-person" data-route="add-person" data-i18n="Add Person">Add Person</a>
   </nav>
 </header>
 
@@ -54,6 +58,6 @@
 
 <div class="toast-wrap" id="toasts" role="status" aria-live="polite"></div>
 
-<script src="/static/app.js?v=4"></script>
+<script src="/static/app.js?v=5"></script>
 </body>
 </html>

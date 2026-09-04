@@ -41,7 +41,7 @@
   letter-spacing: .05em;
   margin-top: 2px;
 }
-.p-mast-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+.p-mast-right { margin-inline-start: auto; display: flex; align-items: center; gap: 14px; }
 .p-back-link {
   font-size: 12px;
   color: var(--gold-soft);
